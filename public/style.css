@@ -691,6 +691,60 @@ tr:hover td { background: rgba(30, 45, 61, 0.5); }
   }
 }
 
+.db-type-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background: rgba(26, 115, 232, 0.2);
+  color: #80b0ff;
+  border: 1px solid rgba(26, 115, 232, 0.3);
+}
+
+.setup-types {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setup-type {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: rgba(15, 25, 35, 0.5);
+  border: 1px solid rgba(42, 58, 74, 0.4);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.setup-type:hover {
+  border-color: rgba(26, 115, 232, 0.4);
+}
+
+.setup-type input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+}
+
+.setup-type-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e0e0e0;
+  display: inline;
+}
+
+.setup-db-form {
+  padding: 12px 0 4px;
+  border-top: 1px solid rgba(42, 58, 74, 0.3);
+  margin-top: 8px;
+}
+
 @media (max-width: 480px) {
   .overview-grid {
     grid-template-columns: 1fr;
