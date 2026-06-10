@@ -1,14 +1,17 @@
 {
-  "name": "pgadmin-web",
+  "name": "postgresql",
   "version": "1.0.0",
-  "description": "Web-based PostgreSQL database manager",
+  "description": "",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["postgresql", "database", "manager", "admin"],
-  "license": "MIT",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.4.2",
     "ejs": "^6.0.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
