@@ -68,4 +68,4 @@ The Admin tab appears after login for **superuser** accounts only. From there yo
 
 ## License
 
-MIT
+MI
