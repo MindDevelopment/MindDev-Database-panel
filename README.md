@@ -1,4 +1,4 @@
-# PostgreSQL Web Manager
+# MindDev Database Manager
 
 Web-based PostgreSQL database manager built with Node.js and Express.
 
