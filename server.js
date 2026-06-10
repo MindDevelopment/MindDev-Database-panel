@@ -1,18 +1,20 @@
+require('dotenv').config();
+
 const express = require('express');
 const session = require('express-session');
 const { Pool } = require('pg');
 const path = require('path');
 
 const app = express();
-const PORT = 3100;
+const PORT = process.env.PORT || 3100;
 
 const ADMIN_DB = {
-  user: process.env.ADMIN_USER || 'USERNAME',
-  password: process.env.ADMIN_PASSWORD || 'PASSWORD',
-  database: 'postgres',
-  host: 'localhost',
-  port: 5432,
-  max: 2
+  user: process.env.ADMIN_USER || 'postgres',
+  password: process.env.ADMIN_PASSWORD || '',
+  database: process.env.ADMIN_DATABASE || 'postgres',
+  host: process.env.ADMIN_HOST || 'localhost',
+  port: process.env.ADMIN_PORT || 5432,
+  max: parseInt(process.env.ADMIN_POOL_MAX) || 2
 };
 const adminPool = new Pool(ADMIN_DB);
 
@@ -23,33 +25,33 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
-  secret: 'pg-manager-secret-key-2024',
+  secret: process.env.SESSION_SECRET || 'pg-manager-secret-key-2024',
   resave: false,
   saveUninitialized: true,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  cookie: { maxAge: parseInt(process.env.SESSION_MAX_AGE) || 24 * 60 * 60 * 1000 }
 }));
 
 function getPool(credentials) {
   return new Pool({
-    host: 'localhost',
-    port: 5432,
+    host: process.env.POOL_HOST || 'localhost',
+    port: process.env.POOL_PORT || 5432,
     user: credentials.user,
     password: credentials.password,
     database: credentials.database || 'postgres',
-    max: 3,
-    idleTimeoutMillis: 10000
+    max: parseInt(process.env.POOL_MAX) || 3,
+    idleTimeoutMillis: parseInt(process.env.POOL_IDLE_TIMEOUT) || 10000
   });
 }
 
 function getAuthPool(credentials) {
   return new Pool({
-    host: 'localhost',
-    port: 5432,
+    host: process.env.POOL_HOST || 'localhost',
+    port: process.env.POOL_PORT || 5432,
     user: credentials.user,
     password: credentials.password,
     database: 'postgres',
-    max: 2,
-    idleTimeoutMillis: 5000
+    max: parseInt(process.env.AUTH_POOL_MAX) || 2,
+    idleTimeoutMillis: parseInt(process.env.AUTH_POOL_IDLE_TIMEOUT) || 5000
   });
 }
 
@@ -213,7 +215,7 @@ app.get('/dashboard', requireDb, async (req, res) => {
       activeConnections: activeConns.rows[0].count,
       database: req.session.credentials.database,
       user: req.session.credentials.user,
-      host: 'localhost'
+      host: process.env.POOL_HOST || 'localhost'
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -441,6 +443,6 @@ app.post('/admin/revoke-db', requireAdminAuth, async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   console.log(`PostgreSQL Manager draait op http://0.0.0.0:${PORT}`);
 });

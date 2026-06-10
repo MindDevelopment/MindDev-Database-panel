@@ -1,4 +1,4 @@
-# MindDev Database Manager
+# PostgreSQL Web Manager
 
 Web-based PostgreSQL database manager built with Node.js and Express.
 
@@ -20,8 +20,8 @@ Web-based PostgreSQL database manager built with Node.js and Express.
 ## Installation
 
 ```bash
-git clone https://github.com/MindDevelopment/MindDev-PM2-manager.git
-cd to the folder
+git clone <repo-url>
+cd pgadmin-web
 npm install
 ```
 
@@ -31,8 +31,8 @@ Credentials are stored as **environment variables** in `server.js` (lines 9–14
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ADMIN_USER` | `USERNAME` | Superuser for system queries |
-| `ADMIN_PASSWORD` | `PASSWORD` | Superuser password |
+| `ADMIN_USER` | `Daan` | Superuser for system queries |
+| `ADMIN_PASSWORD` | `[REMOVED]` | Superuser password |
 
 Edit these directly in `server.js` or set environment variables before starting.
 
