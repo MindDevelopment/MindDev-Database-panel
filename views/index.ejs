@@ -537,6 +537,7 @@ async function selectTable(schema, name) {
 
     const pkCol = data.columns[0]?.column_name || 'id';
     let html = `<h3>Tabel: ${schema}.${name}</h3>`;
+    html += `<div style="margin-bottom:10px"><button class="btn btn-sm" onclick="exportCSV('${schema}','${name}')" style="background:#2a6a3a">&#8595; Export CSV</button></div>`;
     html += '<div class="table-wrapper"><table><thead><tr>';
     data.columns.forEach(c => { html += `<th>${c.column_name}<br><small>${c.data_type}</small></th>`; });
     html += '<th>Acties</th></tr></thead><tbody>';
@@ -620,6 +621,10 @@ async function executeQuery() {
   } catch (err) {
     container.innerHTML = `<div class="alert error">${err.message}</div>`;
   }
+}
+
+function exportCSV(schema, name) {
+  window.open(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/export`, '_blank');
 }
 
 function toggleSidebar() {

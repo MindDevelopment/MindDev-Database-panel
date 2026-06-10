@@ -153,6 +153,37 @@ app.get('/table/:schema/:name', requireDb, async (req, res) => {
   }
 });
 
+app.get('/table/:schema/:name/export', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const pool = getPool(req.session.credentials);
+  try {
+    const result = await pool.query(`SELECT * FROM "${schema}"."${name}"`);
+    const rows = result.rows;
+    if (rows.length === 0) {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${name}.csv"`);
+      return res.send('\ufeff' + Object.keys(rows[0] || {}).join(',') + '\n');
+    }
+    const cols = Object.keys(rows[0]);
+    let csv = '\ufeff' + cols.join(',') + '\n';
+    for (const row of rows) {
+      csv += cols.map(c => {
+        const v = row[c];
+        if (v === null || v === undefined) return '';
+        const s = String(v);
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }).join(',') + '\n';
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await pool.end();
+  }
+});
+
 app.post('/query', requireDb, async (req, res) => {
   const { sql } = req.body;
   if (!sql || !sql.trim()) return res.status(400).json({ error: 'Geen SQL opgegeven' });
