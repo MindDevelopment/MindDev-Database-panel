@@ -146,6 +146,8 @@ async function testConnection(type, credentials) {
       await pool.getConnection();
     }
     return true;
+  } catch {
+    return false;
   } finally {
     await endPool(pool, type);
   }
