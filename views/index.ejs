@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Database Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.min.css">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -57,7 +61,7 @@
             <div class="form-group"><label>Password</label><input type="password" name="mariadb_password" placeholder=""></div>
           </div>
         </div>
-        <button type="submit" class="btn btn-primary" style="margin-top:20px">Save &amp; continue</button>
+        <button type="submit" class="btn btn-primary" style="margin-top:20px"><i class="lucide-check" style="margin-right:4px"></i> Save &amp; continue</button>
       </form>
     </div>
   </div>
@@ -132,7 +136,7 @@
         <div id="adm-users" class="admin-tab-content active">
           <div class="admin-section-header">
             <h4 style="color:#aabbcc">Users / Roles</h4>
-            <button class="btn btn-primary" onclick="showAdmCreateUser()" style="width:auto;margin:0">+ New user</button>
+            <button class="btn btn-primary" onclick="showAdmCreateUser()" style="width:auto;margin:0"><i class="lucide-user-plus" style="margin-right:4px"></i> New user</button>
           </div>
           <div id="admCreateUserForm" class="admin-form" style="display:none">
             <div class="form-group"><label>Username</label><input type="text" id="admNewUserName"></div>
@@ -145,8 +149,8 @@
               <label class="chk"><input type="checkbox" id="admCreateRole"> Can create roles</label>
             </div>
             <div class="form-actions">
-              <button class="btn btn-primary" onclick="admCreateUser()" style="width:auto">Create</button>
-              <button class="btn" onclick="admHideCreateUser()" style="width:auto;background:#3a4a5a">Cancel</button>
+              <button class="btn btn-primary" onclick="admCreateUser()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Create</button>
+              <button class="btn" onclick="admHideCreateUser()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
             </div>
           </div>
           <div id="admUsersList" class="admin-list"></div>
@@ -154,14 +158,14 @@
         <div id="adm-databases" class="admin-tab-content">
           <div class="admin-section-header">
             <h4 style="color:#aabbcc">Databases</h4>
-            <button class="btn btn-primary" onclick="showAdmCreateDb()" style="width:auto;margin:0">+ New database</button>
+            <button class="btn btn-primary" onclick="showAdmCreateDb()" style="width:auto;margin:0"><i class="lucide-database" style="margin-right:4px"></i> New database</button>
           </div>
           <div id="admCreateDbForm" class="admin-form" style="display:none">
             <div class="form-group"><label>Database name</label><input type="text" id="admNewDbName"></div>
             <div class="form-group" id="admOwnerGroup"><label>Owner (empty = current user)</label><input type="text" id="admNewDbOwner"></div>
             <div class="form-actions">
-              <button class="btn btn-primary" onclick="admCreateDb()" style="width:auto">Create</button>
-              <button class="btn" onclick="admHideCreateDb()" style="width:auto;background:#3a4a5a">Cancel</button>
+              <button class="btn btn-primary" onclick="admCreateDb()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Create</button>
+              <button class="btn" onclick="admHideCreateDb()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
             </div>
           </div>
           <div id="admDbsList" class="admin-list"></div>
@@ -182,10 +186,10 @@
               </select>
             </div>
             <div class="form-actions" style="flex-wrap:wrap">
-              <button class="btn btn-primary" onclick="admGrantPerm()" style="width:auto">Grant</button>
-              <button class="btn" onclick="admRevokePerm()" style="width:auto;background:#8a2a2a">Revoke</button>
-              <button class="btn" onclick="admGrantDb()" style="width:auto;background:#2a8a3a">Grant database access</button>
-              <button class="btn" onclick="admRevokeDb()" style="width:auto;background:#8a4a2a">Revoke database access</button>
+              <button class="btn btn-primary" onclick="admGrantPerm()" style="width:auto"><i class="lucide-shield-check" style="margin-right:4px"></i> Grant</button>
+              <button class="btn" onclick="admRevokePerm()" style="width:auto;background:var(--danger-bg);color:var(--danger);border:1px solid rgba(239,68,68,0.2)"><i class="lucide-shield-x" style="margin-right:4px"></i> Revoke</button>
+              <button class="btn" onclick="admGrantDb()" style="width:auto;background:var(--success-bg);color:var(--success);border:1px solid rgba(34,197,94,0.2)"><i class="lucide-database" style="margin-right:4px"></i> Grant DB</button>
+              <button class="btn" onclick="admRevokeDb()" style="width:auto;background:rgba(245,158,11,0.1);color:var(--warning);border:1px solid rgba(245,158,11,0.2)"><i class="lucide-database" style="margin-right:4px"></i> Revoke DB</button>
             </div>
           </div>
           <div id="admPermResult" class="admin-list" style="margin-top:12px"></div>
@@ -228,7 +232,7 @@ async function admLoadUsers() {
     if (!Array.isArray(roles)) { el.innerHTML=`<div class="alert error">Invalid response</div>`; return; }
     let html='<div class="table-wrapper"><table><thead><tr><th>User</th><th>Superuser</th><th>CreateDB</th><th>CreateRole</th><th></th></tr></thead><tbody>';
     roles.forEach(r => {
-      html+=`<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'&#10003;':''}</td><td>${r.rolcreatedb?'&#10003;':''}</td><td>${r.rolcreaterole?'&#10003;':''}</td><td><button class="btn-sm" onclick="admDelRole('${r.rolname.replace(/'/g, "\\'")}')" style="background:#8a2a2a">Delete</button></td></tr>`;
+            html+=`<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreatedb?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreaterole?'<span style="color:var(--success)">&#10003;</span>':''}</td><td><button class="btn-sm" onclick="admDelRole('${r.rolname.replace(/'/g, "\\'")}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2" style="font-size:12px"></i></button></td></tr>`;
     });
     html+='</tbody></table></div>';
     el.innerHTML=html;
@@ -271,7 +275,7 @@ async function admLoadDbs() {
     if (!Array.isArray(dbs)) { el.innerHTML=`<div class="alert error">Invalid response</div>`; return; }
     let html='<div class="table-wrapper"><table><thead><tr><th>Database</th><th>Size</th><th>Owner</th><th></th></tr></thead><tbody>';
     dbs.forEach(d => {
-      html+=`<tr><td><strong>${d.datname}</strong></td><td>${d.size||'?'}</td><td>${d.owner||'-'}</td><td><button class="btn-sm" onclick="admDelDb('${d.datname.replace(/'/g, "\\'")}')" style="background:#8a2a2a">Delete</button></td></tr>`;
+      html+=`<tr><td><strong>${d.datname}</strong></td><td>${d.size||'?'}</td><td>${d.owner||'-'}</td><td><button class="btn-sm" onclick="admDelDb('${d.datname.replace(/'/g, "\\'")}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2" style="font-size:12px"></i></button></td></tr>`;
     });
     html+='</tbody></table></div>';
     el.innerHTML=html;
@@ -322,28 +326,28 @@ async function admGrantPerm() {
   if(!role) return alert('Select a user');
   const r=await fetch('/admin/grant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database:db,privilege:priv})});
   const d=await r.json();
-  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:#1a3a1a;color:#6b6;border:1px solid #2a5a2a">Permissions granted!</div>':`<div class="alert error">${d.error}</div>`;
+  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:var(--success-bg);color:#86efac;border:1px solid rgba(34,197,94,0.2)"><i class="lucide-check-circle" style="margin-right:6px"></i> Permissions granted!</div>':`<div class="alert error">${d.error}</div>`;
 }
 async function admGrantDb() {
   const role=document.getElementById('admPermUser').value,db=document.getElementById('admPermDb').value;
   if(!role||db==='*ALL*') return alert('Select a user and a specific database');
   const r=await fetch('/admin/grant-db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database:db})});
   const d=await r.json();
-  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:#1a3a1a;color:#6b6;border:1px solid #2a5a2a">Access granted!</div>':`<div class="alert error">${d.error}</div>`;
+  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:var(--success-bg);color:#86efac;border:1px solid rgba(34,197,94,0.2)"><i class="lucide-check-circle" style="margin-right:6px"></i> Access granted!</div>':`<div class="alert error">${d.error}</div>`;
 }
 async function admRevokePerm() {
   const role=document.getElementById('admPermUser').value,db=document.getElementById('admPermDb').value,priv=document.getElementById('admPermPriv').value;
   if(!role) return alert('Select a user');
   const r=await fetch('/admin/revoke',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database:db,privilege:priv})});
   const d=await r.json();
-  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:#3a1a1a;color:#ff6b6b;border:1px solid #5a2a2a">Permissions revoked!</div>':`<div class="alert error">${d.error}</div>`;
+  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:var(--danger-bg);color:#fca5a5;border:1px solid rgba(239,68,68,0.2)"><i class="lucide-x-circle" style="margin-right:6px"></i> Permissions revoked!</div>':`<div class="alert error">${d.error}</div>`;
 }
 async function admRevokeDb() {
   const role=document.getElementById('admPermUser').value,db=document.getElementById('admPermDb').value;
   if(!role||db==='*ALL*') return alert('Select a user and a specific database');
   const r=await fetch('/admin/revoke-db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database:db})});
   const d=await r.json();
-  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:#3a1a1a;color:#ff6b6b;border:1px solid #5a2a2a">Access revoked!</div>':`<div class="alert error">${d.error}</div>`;
+  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:var(--danger-bg);color:#fca5a5;border:1px solid rgba(239,68,68,0.2)"><i class="lucide-x-circle" style="margin-right:6px"></i> Access revoked!</div>':`<div class="alert error">${d.error}</div>`;
 }
 </script>
 
@@ -361,7 +365,7 @@ async function admRevokeDb() {
       <div id="admin2-users" class="admin-tab-content active">
         <div class="admin-section-header">
           <h3 style="color:#fff">Users / Roles</h3>
-          <button class="btn btn-primary" onclick="showCreateUser2()" style="width:auto;margin:0">+ New user</button>
+          <button class="btn btn-primary" onclick="showCreateUser2()" style="width:auto;margin:0"><i class="lucide-user-plus" style="margin-right:4px"></i> New user</button>
         </div>
         <div id="createUserForm2" class="admin-form" style="display:none">
           <h4>New user</h4>
@@ -374,8 +378,8 @@ async function admRevokeDb() {
             <label class="chk"><input type="checkbox" id="newUserCreateRole2"> Can create roles</label>
           </div>
           <div class="form-actions">
-            <button class="btn btn-primary" onclick="createUser2()" style="width:auto">Create</button>
-            <button class="btn" onclick="hideCreateUser2()" style="width:auto;background:#3a4a5a">Cancel</button>
+            <button class="btn btn-primary" onclick="createUser2()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Create</button>
+            <button class="btn" onclick="hideCreateUser2()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
           </div>
         </div>
         <div id="usersList2" class="admin-list"></div>
@@ -384,15 +388,15 @@ async function admRevokeDb() {
       <div id="admin2-databases" class="admin-tab-content">
         <div class="admin-section-header">
           <h3 style="color:#fff">Databases</h3>
-          <button class="btn btn-primary" onclick="showCreateDb2()" style="width:auto;margin:0">+ New database</button>
+          <button class="btn btn-primary" onclick="showCreateDb2()" style="width:auto;margin:0"><i class="lucide-database" style="margin-right:4px"></i> New database</button>
         </div>
         <div id="createDbForm2" class="admin-form" style="display:none">
           <h4>New database</h4>
           <div class="form-group"><label>Database name</label><input type="text" id="newDbName2"></div>
           <div class="form-group"><label>Owner (empty = current user)</label><input type="text" id="newDbOwner2"></div>
           <div class="form-actions">
-            <button class="btn btn-primary" onclick="createDb2()" style="width:auto">Create</button>
-            <button class="btn" onclick="hideCreateDb2()" style="width:auto;background:#3a4a5a">Cancel</button>
+            <button class="btn btn-primary" onclick="createDb2()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Create</button>
+            <button class="btn" onclick="hideCreateDb2()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
           </div>
         </div>
         <div id="databasesList2" class="admin-list"></div>
@@ -414,15 +418,15 @@ async function admRevokeDb() {
             </select>
           </div>
           <div class="form-actions">
-            <button class="btn btn-primary" onclick="grantPermission2()" style="width:auto">Grant</button>
-            <button class="btn" onclick="grantDbAccess2()" style="width:auto;background:#2a8a3a">Grant database access</button>
+            <button class="btn btn-primary" onclick="grantPermission2()" style="width:auto"><i class="lucide-shield-check" style="margin-right:4px"></i> Grant</button>
+            <button class="btn" onclick="grantDbAccess2()" style="width:auto;background:var(--success-bg);color:var(--success);border:1px solid rgba(34,197,94,0.2)"><i class="lucide-database" style="margin-right:4px"></i> Grant DB access</button>
           </div>
         </div>
         <div id="permResult2" class="admin-list" style="margin-top:12px"></div>
       </div>
 
       <div style="margin-top:20px;text-align:center">
-        <a href="/databases" class="admin-link" style="display:inline-block;padding:10px 20px;background:#1a73e8;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">&#8644; Go to databases</a>
+        <a href="/databases" class="admin-link" style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;background:linear-gradient(135deg,var(--accent),#2563eb);color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(59,130,246,0.3)"><i class="lucide-repeat-2"></i> Go to databases</a>
         <br><br>
         <a href="/logout" class="logout-link">Log out</a>
       </div>
@@ -449,7 +453,7 @@ async function loadUsers2() {
     const roles = await res.json();
     if (roles.error) throw new Error(roles.error);
     el.innerHTML = '<div class="table-wrapper"><table><thead><tr><th>Role</th><th>Superuser</th><th>Login</th><th>Create DB</th><th>Create Role</th><th>Connections</th><th></th></tr></thead><tbody>' +
-      roles.map(r => `<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'&#10003;':''}</td><td>${r.rolcanlogin?'&#10003;':''}</td><td>${r.rolcreatedb?'&#10003;':''}</td><td>${r.rolcreaterole?'&#10003;':''}</td><td>${r.rolconnlimit}</td><td><button class="btn-sm" onclick="deleteRole2('${r.rolname}')" style="background:#8a2a2a">Delete</button></td></tr>`).join('') + '</tbody></table></div>';
+      roles.map(r => `<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcanlogin?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreatedb?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreaterole?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolconnlimit}</td><td><button class="btn-sm" onclick="deleteRole2('${r.rolname}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2" style="font-size:12px"></i></button></td></tr>`).join('') + '</tbody></table></div>';
   } catch (err) { el.innerHTML = `<div class="alert error">${err.message}</div>`; }
 }
 function showCreateUser2() { document.getElementById('createUserForm2').style.display='block'; }
@@ -483,7 +487,7 @@ async function loadAdminDbs2() {
     const dbs = await res.json();
     if (dbs.error) throw new Error(dbs.error);
     el.innerHTML = '<div class="table-wrapper"><table><thead><tr><th>Database</th><th>Size</th><th>Owner</th><th>Encoding</th><th></th></tr></thead><tbody>' +
-      dbs.map(d => `<tr><td><strong>${d.datname}</strong></td><td>${d.size}</td><td>${d.owner}</td><td>${d.encoding}</td><td><button class="btn-sm" onclick="deleteDb2('${d.datname}')" style="background:#8a2a2a">Delete</button></td></tr>`).join('') + '</tbody></table></div>';
+      dbs.map(d => `<tr><td><strong>${d.datname}</strong></td><td>${d.size}</td><td>${d.owner}</td><td>${d.encoding}</td><td><button class="btn-sm" onclick="deleteDb2('${d.datname}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2" style="font-size:12px"></i></button></td></tr>`).join('') + '</tbody></table></div>';
   } catch (err) { el.innerHTML = `<div class="alert error">${err.message}</div>`; }
 }
 function showCreateDb2() { document.getElementById('createDbForm2').style.display='block'; }
@@ -521,7 +525,7 @@ async function grantPermission2() {
   const r = await fetch('/admin/grant', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database,privilege})});
   const d = await r.json();
   document.getElementById('permResult2').innerHTML = d.success
-    ? '<div class="alert" style="background:#1a3a1a;color:#6b6;border:1px solid #2a5a2a">Permissions granted!</div>'
+    ? '<div class="alert" style="background:var(--success-bg);color:#86efac;border:1px solid rgba(34,197,94,0.2)"><i class="lucide-check-circle" style="margin-right:6px"></i> Permissions granted!</div>'
     : `<div class="alert error">${d.error}</div>`;
 }
 async function grantDbAccess2() {
@@ -531,7 +535,7 @@ async function grantDbAccess2() {
   const r = await fetch('/admin/grant-db', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database})});
   const d = await r.json();
   document.getElementById('permResult2').innerHTML = d.success
-    ? '<div class="alert" style="background:#1a3a1a;color:#6b6;border:1px solid #2a5a2a">Database access granted!</div>'
+    ? '<div class="alert" style="background:var(--success-bg);color:#86efac;border:1px solid rgba(34,197,94,0.2)"><i class="lucide-check-circle" style="margin-right:6px"></i> Database access granted!</div>'
     : `<div class="alert error">${d.error}</div>`;
 }
 window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
@@ -551,13 +555,13 @@ window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
       </div>
       <nav class="sidebar-nav">
         <button class="nav-btn active" data-view="overview" onclick="showView('overview')">
-          <span class="icon">&#9679;</span> Overview
+          <span class="icon"><i class="lucide-layout-dashboard"></i></span> Overview
         </button>
         <button class="nav-btn" data-view="tables" onclick="showView('tables')">
-          <span class="icon">&#9776;</span> Tables
+          <span class="icon"><i class="lucide-table-2"></i></span> Tables
         </button>
         <button class="nav-btn" data-view="query" onclick="showView('query')">
-          <span class="icon">&#9998;</span> SQL Query
+          <span class="icon"><i class="lucide-terminal"></i></span> SQL Query
         </button>
       </nav>
       <div class="table-list" id="tableList">
@@ -565,7 +569,7 @@ window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
         <div id="tableItems"></div>
       </div>
       <div class="sidebar-footer">
-        <a href="/databases" class="nav-btn" style="justify-content: center; margin-bottom: 4px;">&#8644; Switch database</a>
+        <a href="/databases" class="nav-btn" style="justify-content: center; margin-bottom: 4px;"><i class="lucide-repeat-2" style="margin-right:6px"></i> Switch database</a>
         <a href="/logout" class="logout-btn">Log out</a>
       </div>
     </aside>
@@ -588,7 +592,7 @@ window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
         <h2>SQL Query</h2>
         <div class="query-editor">
           <textarea id="sqlInput" rows="6" placeholder="Enter SQL query..."></textarea>
-          <button class="btn btn-primary" onclick="executeQuery()">Execute</button>
+          <button class="btn btn-primary" onclick="executeQuery()"><i class="lucide-play" style="margin-right:4px"></i> Execute</button>
         </div>
         <div id="queryResult"></div>
       </div>
@@ -637,7 +641,7 @@ async function loadTables() {
     const list = document.getElementById('tableItems');
     list.innerHTML = tables.map(t =>
       `<a href="#" class="table-item" onclick="return selectTable('${t.table_schema}','${t.table_name}')">
-        <span class="table-icon">&#9632;</span> ${t.table_name}
+        <span class="table-icon"><i class="lucide-table-2"></i></span> ${t.table_name}
         <small>${t.table_schema}</small>
       </a>`
     ).join('');
@@ -657,7 +661,7 @@ async function selectTable(schema, name) {
 
     const pkCol = data.columns[0]?.column_name || 'id';
     let html = `<h3>Table: ${schema}.${name}</h3>`;
-    html += `<div style="margin-bottom:10px"><button class="btn btn-sm" onclick="exportCSV('${schema}','${name}')" style="background:#2a6a3a">&#8595; Export CSV</button></div>`;
+    html += `<div style="margin-bottom:10px"><button class="btn btn-sm" onclick="exportCSV('${schema}','${name}')" style="background:#2a6a3a"><i class="lucide-download" style="margin-right:4px"></i> Export CSV</button></div>`;
     html += '<div class="table-wrapper"><table><thead><tr>';
     data.columns.forEach(c => { html += `<th>${c.column_name}<br><small>${c.data_type}</small></th>`; });
     html += '<th>Actions</th></tr></thead><tbody>';
@@ -671,7 +675,7 @@ async function selectTable(schema, name) {
           data-pkcol="${pkCol}" data-pkval="${row[pkCol]}"
           data-col="${c.column_name}">${val !== null && val !== undefined ? val : '<span class="null">NULL</span>'}</td>`;
       });
-      html += '<td><button class="btn-sm" onclick="saveRow(this)">Save</button></td>';
+      html += '<td><button class="btn-sm" onclick="saveRow(this)"><i class="lucide-check" style="margin-right:3px"></i> Save</button></td>';
       html += '</tr>';
     });
     html += '</tbody></table></div>';
