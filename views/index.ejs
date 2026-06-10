@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PostgreSQL Manager</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<% if (view === 'login') { %>
+  <div class="login-container">
+    <div class="login-card">
+      <h1>PostgreSQL Manager</h1>
+      <p class="subtitle">Log in op de database</p>
+      <% if (error) { %>
+        <div class="alert error"><%= error %></div>
+      <% } %>
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label for="user">Gebruiker</label>
+          <input type="text" id="user" name="user" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="password">Wachtwoord</label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        <div class="form-group">
+          <label for="database">Database <small>(optioneel — leeg laten om alle databases te zien)</small></label>
+          <input type="text" id="database" name="database" placeholder="postgres">
+        </div>
+        <button type="submit" class="btn btn-primary">Inloggen</button>
+      </form>
+    </div>
+  </div>
+
+<% } else if (view === 'databases') { %>
+  <div class="login-container">
+    <div class="login-card" style="max-width:700px">
+      <h1>Kies een database</h1>
+      <p class="subtitle">Ingelogd als <strong><%= creds.user %></strong></p>
+      <% if (error) { %>
+        <div class="alert error"><%= error %></div>
+      <% } %>
+      <div class="db-list">
+        <% databases.forEach(function(db) { %>
+          <form method="POST" action="/select-database">
+            <input type="hidden" name="database" value="<%= db.datname %>">
+            <button type="submit" class="db-choice"><%= db.datname %></button>
+          </form>
+        <% }); %>
+      </div>
+
+      <div id="adminSection" style="display:none;margin-top:24px;border-top:1px solid #2a3a4a;padding-top:20px">
+        <h3 style="color:#fff;margin-bottom:12px">&#9881; Beheer</h3>
+        <div class="admin-tabs">
+          <button class="admin-tab active" onclick="showAdmTab('users')">Gebruikers</button>
+          <button class="admin-tab" onclick="showAdmTab('databases')">Databases</button>
+          <button class="admin-tab" onclick="showAdmTab('permissions')">Rechten</button>
+        </div>
+        <div id="adm-users" class="admin-tab-content active">
+          <div class="admin-section-header">
+            <h4 style="color:#aabbcc">Gebruikers / Rollen</h4>
+            <button class="btn btn-primary" onclick="showAdmCreateUser()" style="width:auto;margin:0">+ Nieuwe gebruiker</button>
+          </div>
+          <div id="admCreateUserForm" class="admin-form" style="display:none">
+            <div class="form-group"><label>Gebruikersnaam</label><input type="text" id="admNewUserName"></div>
+            <div class="form-group"><label>Wachtwoord</label><input type="text" id="admNewUserPass"></div>
+            <div class="form-row">
+              <label class="chk"><input type="checkbox" id="admCanLogin" checked> Mag inloggen</label>
+              <label class="chk"><input type="checkbox" id="admSuperuser"> Superuser</label>
+              <label class="chk"><input type="checkbox" id="admCreateDb"> Mag databases maken</label>
+              <label class="chk"><input type="checkbox" id="admCreateRole"> Mag rollen maken</label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" onclick="admCreateUser()" style="width:auto">Aanmaken</button>
+              <button class="btn" onclick="admHideCreateUser()" style="width:auto;background:#3a4a5a">Annuleren</button>
+            </div>
+          </div>
+          <div id="admUsersList" class="admin-list"></div>
+        </div>
+        <div id="adm-databases" class="admin-tab-content">
+          <div class="admin-section-header">
+            <h4 style="color:#aabbcc">Databases</h4>
+            <button class="btn btn-primary" onclick="showAdmCreateDb()" style="width:auto;margin:0">+ Nieuwe database</button>
+          </div>
+          <div id="admCreateDbForm" class="admin-form" style="display:none">
+            <div class="form-group"><label>Databasenaam</label><input type="text" id="admNewDbName"></div>
+            <div class="form-group"><label>Eigenaar (leeg = huidige gebruiker)</label><input type="text" id="admNewDbOwner"></div>
+            <div class="form-actions">
+              <button class="btn btn-primary" onclick="admCreateDb()" style="width:auto">Aanmaken</button>
+              <button class="btn" onclick="admHideCreateDb()" style="width:auto;background:#3a4a5a">Annuleren</button>
+            </div>
+          </div>
+          <div id="admDbsList" class="admin-list"></div>
+        </div>
+        <div id="adm-permissions" class="admin-tab-content">
+          <h4 style="color:#aabbcc;margin-bottom:12px">Rechten beheren</h4>
+          <div class="admin-form">
+            <div class="form-group"><label>Gebruiker</label><select id="admPermUser"></select></div>
+            <div class="form-group"><label>Database</label><select id="admPermDb"></select></div>
+            <div class="form-group">
+              <label>Privilege</label>
+              <select id="admPermPriv">
+                <option value="SELECT">SELECT (Lezen)</option>
+                <option value="INSERT">INSERT (Invoegen)</option>
+                <option value="UPDATE">UPDATE (Bijwerken)</option>
+                <option value="DELETE">DELETE (Verwijderen)</option>
+                <option value="ALL">ALL (Alle)</option>
+              </select>
+            </div>
+            <div class="form-actions" style="flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="admGrantPerm()" style="width:auto">Recht geven</button>
+              <button class="btn" onclick="admRevokePerm()" style="width:auto;background:#8a2a2a">Recht afpakken</button>
+              <button class="btn" onclick="admGrantDb()" style="width:auto;background:#2a8a3a">Databasetoegang geven</button>
+              <button class="btn" onclick="admRevokeDb()" style="width:auto;background:#8a4a2a">Databasetoegang afpakken</button>
+            </div>
+          </div>
+          <div id="admPermResult" class="admin-list" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; text-align: center;">
+        <a href="/logout" class="logout-link">Uitloggen</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+(async function() {
+  try {
+    const r = await fetch('/admin/check'); const d = await r.json();
+    if (d.superuser) {
+      document.getElementById('adminSection').style.display = '';
+      showAdmTab('users');
+    }
+  } catch(e) {}
+})();
+function showAdmTab(t) {
+  document.querySelectorAll('#adminSection .admin-tab-content').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('#adminSection .admin-tab').forEach(e=>e.classList.remove('active'));
+  document.getElementById('adm-'+t).classList.add('active');
+  document.querySelector('#adminSection .admin-tab[onclick*="'+t+'"]').classList.add('active');
+  if (t==='users') admLoadUsers();
+  if (t==='databases') admLoadDbs();
+  if (t==='permissions') { admLoadPermUsers(); admLoadPermDbs(); }
+}
+async function admLoadUsers() {
+  const el=document.getElementById('admUsersList'); el.innerHTML='<div class="loading">Laden...</div>';
+  try {
+    const r=await fetch('/admin/roles'); const roles=await r.json();
+    el.innerHTML='<div class="table-wrapper"><table><thead><tr><th>Rol</th><th>Superuser</th><th>Login</th><th>CreateDB</th><th>CreateRole</th><th></th></tr></thead><tbody>'+
+      roles.map(r=>`<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'&#10003;':''}</td><td>${r.rolcanlogin?'&#10003;':''}</td><td>${r.rolcreatedb?'&#10003;':''}</td><td>${r.rolcreaterole?'&#10003;':''}</td><td><button class="btn-sm" onclick="admDelRole('${r.rolname}')" style="background:#8a2a2a">Verwijder</button></td></tr>`).join('')+'</tbody></table></div>';
+  } catch(e) { el.innerHTML=`<div class="alert error">${e.message}</div>`; }
+}
+function showAdmCreateUser() { document.getElementById('admCreateUserForm').style.display='block'; document.getElementById('admNewUserName').focus(); }
+function admHideCreateUser() { document.getElementById('admCreateUserForm').style.display='none'; }
+async function admCreateUser() {
+  const n=document.getElementById('admNewUserName').value.trim(); if(!n) return alert('Voer een gebruikersnaam in');
+  const r=await fetch('/admin/role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    name:n,password:document.getElementById('admNewUserPass').value,
+    canLogin:document.getElementById('admCanLogin').checked,superuser:document.getElementById('admSuperuser').checked,
+    createDb:document.getElementById('admCreateDb').checked,createRole:document.getElementById('admCreateRole').checked
+  })}); const d=await r.json();
+  if(d.error) return alert('Fout: '+d.error);
+  admHideCreateUser(); document.getElementById('admNewUserName').value=''; document.getElementById('admNewUserPass').value=''; admLoadUsers();
+}
+async function admDelRole(name) {
+  if(!confirm(`Verwijder "${name}"?`)) return;
+  const r=await fetch(`/admin/role/${encodeURIComponent(name)}`,{method:'DELETE'}); const d=await r.json();
+  if(d.error) return alert('Fout: '+d.error); admLoadUsers();
+}
+async function admLoadDbs() {
+  const el=document.getElementById('admDbsList'); el.innerHTML='<div class="loading">Laden...</div>';
+  try {
+    const r=await fetch('/admin/dbs'); const dbs=await r.json();
+    el.innerHTML='<div class="table-wrapper"><table><thead><tr><th>Database</th><th>Grootte</th><th>Eigenaar</th><th></th></tr></thead><tbody>'+
+      dbs.map(d=>`<tr><td><strong>${d.datname}</strong></td><td>${d.size}</td><td>${d.owner}</td><td><button class="btn-sm" onclick="admDelDb('${d.datname}')" style="background:#8a2a2a">Verwijder</button></td></tr>`).join('')+'</tbody></table></div>';
+  } catch(e) { el.innerHTML=`<div class="alert error">${e.message}</div>`; }
+}
+function showAdmCreateDb() { document.getElementById('admCreateDbForm').style.display='block'; }
+function admHideCreateDb() { document.getElementById('admCreateDbForm').style.display='none'; }
+async function admCreateDb() {
+  const n=document.getElementById('admNewDbName').value.trim(); if(!n) return alert('Voer een databasenaam in');
+  const r=await fetch('/admin/db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,owner:document.getElementById('admNewDbOwner').value.trim()||undefined})});
+  const d=await r.json(); if(d.error) return alert('Fout: '+d.error);
+  admHideCreateDb(); document.getElementById('admNewDbName').value=''; document.getElementById('admNewDbOwner').value=''; admLoadDbs();
+}
+async function admDelDb(name) {
+  if(!confirm(`Database "${name}" verwijderen?\n\nDit kan niet ongedaan worden gemaakt!`)) return;
+  const r=await fetch(`/admin/db/${encodeURIComponent(name)}`,{method:'DELETE'}); const d=await r.json();
+  if(d.error) return alert('Fout: '+d.error); admLoadDbs();
+}
+async function admLoadPermUsers() {
+  const sel=document.getElementById('admPermUser'); const r=await fetch('/admin/roles'); const roles=await r.json();
+  sel.innerHTML=roles.filter(r=>r.rolcanlogin).map(r=>`<option value="${r.rolname}">${r.rolname}</option>`).join('');
+}
+async function admLoadPermDbs() {
+  const sel=document.getElementById('admPermDb'); sel.innerHTML='<option value="*ALL*">Alle databases (public schema)</option>';
+  const r=await fetch('/admin/dbs'); const dbs=await r.json(); dbs.forEach(d=>{sel.innerHTML+=`<option value="${d.datname}">${d.datname}</option>`;});
+}
+async function admGrantPerm() {
+  const role=document.getElementById('admPermUser').value,db=document.getElementById('admPermDb').value,priv=document.getElementById('admPermPriv').value;
+  if(!role) return alert('Selecteer een gebruiker');
+  const r=await fetch('/admin/grant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database:db,privilege:priv})});
+  const d=await r.json();
+  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:#1a3a1a;color:#6b6;border:1px solid #2a5a2a">Rechten toegekend!</div>':`<div class="alert error">${d.error}</div>`;
+}
+async function admGrantDb() {
+  const role=document.getElementById('admPermUser').value,db=document.getElementById('admPermDb').value;
+  if(!role||db==='*ALL*') return alert('Selecteer een gebruiker en een specifieke database');
+  const r=await fetch('/admin/grant-db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database:db})});
+  const d=await r.json();
+  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:#1a3a1a;color:#6b6;border:1px solid #2a5a2a">Databasetoegang toegekend!</div>':`<div class="alert error">${d.error}</div>`;
+}
+async function admRevokePerm() {
+  const role=document.getElementById('admPermUser').value,db=document.getElementById('admPermDb').value,priv=document.getElementById('admPermPriv').value;
+  if(!role) return alert('Selecteer een gebruiker');
+  const r=await fetch('/admin/revoke',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database:db,privilege:priv})});
+  const d=await r.json();
+  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:#3a1a1a;color:#ff6b6b;border:1px solid #5a2a2a">Rechten afgepakt!</div>':`<div class="alert error">${d.error}</div>`;
+}
+async function admRevokeDb() {
+  const role=document.getElementById('admPermUser').value,db=document.getElementById('admPermDb').value;
+  if(!role||db==='*ALL*') return alert('Selecteer een gebruiker en een specifieke database');
+  const r=await fetch('/admin/revoke-db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database:db})});
+  const d=await r.json();
+  document.getElementById('admPermResult').innerHTML=d.success?'<div class="alert" style="background:#3a1a1a;color:#ff6b6b;border:1px solid #5a2a2a">Databasetoegang afgepakt!</div>':`<div class="alert error">${d.error}</div>`;
+}
+</script>
+
+<% } else if (view === 'admin') { %>
+  <div class="login-container">
+    <div class="login-card" style="max-width:700px">
+      <h1>Admin Paneel</h1>
+      <p class="subtitle">Ingelogd als <strong><%= creds.user %></strong></p>
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="showAdminTab2('users')">Gebruikers</button>
+        <button class="admin-tab" onclick="showAdminTab2('databases')">Databases</button>
+        <button class="admin-tab" onclick="showAdminTab2('permissions')">Rechten</button>
+      </div>
+
+      <div id="admin2-users" class="admin-tab-content active">
+        <div class="admin-section-header">
+          <h3 style="color:#fff">Gebruikers / Rollen</h3>
+          <button class="btn btn-primary" onclick="showCreateUser2()" style="width:auto;margin:0">+ Nieuwe gebruiker</button>
+        </div>
+        <div id="createUserForm2" class="admin-form" style="display:none">
+          <h4>Nieuwe gebruiker aanmaken</h4>
+          <div class="form-group"><label>Gebruikersnaam</label><input type="text" id="newUserName2"></div>
+          <div class="form-group"><label>Wachtwoord</label><input type="text" id="newUserPassword2"></div>
+          <div class="form-row">
+            <label class="chk"><input type="checkbox" id="newUserCanLogin2" checked> Mag inloggen</label>
+            <label class="chk"><input type="checkbox" id="newUserSuperuser2"> Superuser</label>
+            <label class="chk"><input type="checkbox" id="newUserCreateDb2"> Mag databases maken</label>
+            <label class="chk"><input type="checkbox" id="newUserCreateRole2"> Mag rollen maken</label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="createUser2()" style="width:auto">Aanmaken</button>
+            <button class="btn" onclick="hideCreateUser2()" style="width:auto;background:#3a4a5a">Annuleren</button>
+          </div>
+        </div>
+        <div id="usersList2" class="admin-list"></div>
+      </div>
+
+      <div id="admin2-databases" class="admin-tab-content">
+        <div class="admin-section-header">
+          <h3 style="color:#fff">Databases</h3>
+          <button class="btn btn-primary" onclick="showCreateDb2()" style="width:auto;margin:0">+ Nieuwe database</button>
+        </div>
+        <div id="createDbForm2" class="admin-form" style="display:none">
+          <h4>Nieuwe database aanmaken</h4>
+          <div class="form-group"><label>Databasenaam</label><input type="text" id="newDbName2"></div>
+          <div class="form-group"><label>Eigenaar (leeg = huidige gebruiker)</label><input type="text" id="newDbOwner2"></div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="createDb2()" style="width:auto">Aanmaken</button>
+            <button class="btn" onclick="hideCreateDb2()" style="width:auto;background:#3a4a5a">Annuleren</button>
+          </div>
+        </div>
+        <div id="databasesList2" class="admin-list"></div>
+      </div>
+
+      <div id="admin2-permissions" class="admin-tab-content">
+        <h3 style="color:#fff;margin-bottom:12px">Rechten beheren</h3>
+        <div class="admin-form">
+          <div class="form-group"><label>Gebruiker</label><select id="permUser2"></select></div>
+          <div class="form-group"><label>Database</label><select id="permDb2"></select></div>
+          <div class="form-group">
+            <label>Privilege</label>
+            <select id="permPrivilege2">
+              <option value="SELECT">SELECT (Lezen)</option>
+              <option value="INSERT">INSERT (Invoegen)</option>
+              <option value="UPDATE">UPDATE (Bijwerken)</option>
+              <option value="DELETE">DELETE (Verwijderen)</option>
+              <option value="ALL">ALL (Alle)</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="grantPermission2()" style="width:auto">Recht geven</button>
+            <button class="btn" onclick="grantDbAccess2()" style="width:auto;background:#2a8a3a">Databasetoegang geven</button>
+          </div>
+        </div>
+        <div id="permResult2" class="admin-list" style="margin-top:12px"></div>
+      </div>
+
+      <div style="margin-top:20px;text-align:center">
+        <a href="/databases" class="admin-link" style="display:inline-block;padding:10px 20px;background:#1a73e8;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">&#8644; Naar databases</a>
+        <br><br>
+        <a href="/logout" class="logout-link">Uitloggen</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+function showAdminTab2(tab) {
+  document.querySelectorAll('#admin2-' + tab).forEach(el => {
+    document.querySelectorAll('.admin-tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('admin2-' + tab).classList.add('active');
+    document.querySelector('.admin-tab[onclick*="' + tab + '"]').classList.add('active');
+    if (tab === 'users') loadUsers2();
+    if (tab === 'databases') loadAdminDbs2();
+    if (tab === 'permissions') { loadPermUsers2(); loadPermDbs2(); }
+  });
+}
+async function loadUsers2() {
+  const el = document.getElementById('usersList2');
+  el.innerHTML = '<div class="loading">Laden...</div>';
+  try {
+    const res = await fetch('/admin/roles');
+    const roles = await res.json();
+    if (roles.error) throw new Error(roles.error);
+    el.innerHTML = '<div class="table-wrapper"><table><thead><tr><th>Rol</th><th>Superuser</th><th>Inloggen</th><th>Create DB</th><th>Create Role</th><th>Connecties</th><th></th></tr></thead><tbody>' +
+      roles.map(r => `<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'&#10003;':''}</td><td>${r.rolcanlogin?'&#10003;':''}</td><td>${r.rolcreatedb?'&#10003;':''}</td><td>${r.rolcreaterole?'&#10003;':''}</td><td>${r.rolconnlimit}</td><td><button class="btn-sm" onclick="deleteRole2('${r.rolname}')" style="background:#8a2a2a">Verwijder</button></td></tr>`).join('') + '</tbody></table></div>';
+  } catch (err) { el.innerHTML = `<div class="alert error">${err.message}</div>`; }
+}
+function showCreateUser2() { document.getElementById('createUserForm2').style.display='block'; }
+function hideCreateUser2() { document.getElementById('createUserForm2').style.display='none'; }
+async function createUser2() {
+  const name = document.getElementById('newUserName2').value.trim();
+  if (!name) return alert('Voer een gebruikersnaam in');
+  const r = await fetch('/admin/role', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    name, password: document.getElementById('newUserPassword2').value,
+    canLogin: document.getElementById('newUserCanLogin2').checked,
+    superuser: document.getElementById('newUserSuperuser2').checked,
+    createDb: document.getElementById('newUserCreateDb2').checked,
+    createRole: document.getElementById('newUserCreateRole2').checked
+  })});
+  const d = await r.json();
+  if (d.error) return alert('Fout: '+d.error);
+  hideCreateUser2(); document.getElementById('newUserName2').value=''; document.getElementById('newUserPassword2').value='';
+  loadUsers2();
+}
+async function deleteRole2(name) {
+  if (!confirm(`Weet je zeker dat je "${name}" wilt verwijderen?`)) return;
+  const r = await fetch(`/admin/role/${encodeURIComponent(name)}`,{method:'DELETE'});
+  const d = await r.json();
+  if (d.error) return alert('Fout: '+d.error); loadUsers2();
+}
+async function loadAdminDbs2() {
+  const el = document.getElementById('databasesList2');
+  el.innerHTML = '<div class="loading">Laden...</div>';
+  try {
+    const res = await fetch('/admin/dbs');
+    const dbs = await res.json();
+    if (dbs.error) throw new Error(dbs.error);
+    el.innerHTML = '<div class="table-wrapper"><table><thead><tr><th>Database</th><th>Grootte</th><th>Eigenaar</th><th>Encoding</th><th></th></tr></thead><tbody>' +
+      dbs.map(d => `<tr><td><strong>${d.datname}</strong></td><td>${d.size}</td><td>${d.owner}</td><td>${d.encoding}</td><td><button class="btn-sm" onclick="deleteDb2('${d.datname}')" style="background:#8a2a2a">Verwijder</button></td></tr>`).join('') + '</tbody></table></div>';
+  } catch (err) { el.innerHTML = `<div class="alert error">${err.message}</div>`; }
+}
+function showCreateDb2() { document.getElementById('createDbForm2').style.display='block'; }
+function hideCreateDb2() { document.getElementById('createDbForm2').style.display='none'; }
+async function createDb2() {
+  const name = document.getElementById('newDbName2').value.trim();
+  if (!name) return alert('Voer een databasenaam in');
+  const r = await fetch('/admin/db', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,owner:document.getElementById('newDbOwner2').value.trim()||undefined})});
+  const d = await r.json();
+  if (d.error) return alert('Fout: '+d.error);
+  hideCreateDb2(); document.getElementById('newDbName2').value=''; document.getElementById('newDbOwner2').value=''; loadAdminDbs2();
+}
+async function deleteDb2(name) {
+  if (!confirm(`Weet je zeker dat je database "${name}" wilt verwijderen?\n\nDit kan niet ongedaan worden gemaakt!`)) return;
+  const r = await fetch(`/admin/db/${encodeURIComponent(name)}`,{method:'DELETE'});
+  const d = await r.json();
+  if (d.error) return alert('Fout: '+d.error); loadAdminDbs2();
+}
+async function loadPermUsers2() {
+  const sel = document.getElementById('permUser2');
+  const r = await fetch('/admin/roles'); const roles = await r.json();
+  sel.innerHTML = roles.filter(r=>r.rolcanlogin).map(r=>`<option value="${r.rolname}">${r.rolname}</option>`).join('');
+}
+async function loadPermDbs2() {
+  const sel = document.getElementById('permDb2');
+  sel.innerHTML = '<option value="*ALL*">Alle databases (public schema)</option>';
+  const r = await fetch('/admin/dbs'); const dbs = await r.json();
+  dbs.forEach(d => { sel.innerHTML += `<option value="${d.datname}">${d.datname}</option>`; });
+}
+async function grantPermission2() {
+  const role = document.getElementById('permUser2').value;
+  const database = document.getElementById('permDb2').value;
+  const privilege = document.getElementById('permPrivilege2').value;
+  if (!role) return alert('Selecteer een gebruiker');
+  const r = await fetch('/admin/grant', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database,privilege})});
+  const d = await r.json();
+  document.getElementById('permResult2').innerHTML = d.success
+    ? '<div class="alert" style="background:#1a3a1a;color:#6b6;border:1px solid #2a5a2a">Rechten toegekend!</div>'
+    : `<div class="alert error">${d.error}</div>`;
+}
+async function grantDbAccess2() {
+  const role = document.getElementById('permUser2').value;
+  const database = document.getElementById('permDb2').value;
+  if (!role || database === '*ALL*') return alert('Selecteer een gebruiker en een specifieke database');
+  const r = await fetch('/admin/grant-db', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,database})});
+  const d = await r.json();
+  document.getElementById('permResult2').innerHTML = d.success
+    ? '<div class="alert" style="background:#1a3a1a;color:#6b6;border:1px solid #2a5a2a">Databasetoegang toegekend!</div>'
+    : `<div class="alert error">${d.error}</div>`;
+}
+window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
+</script>
+
+<% } else if (view === 'manager') { %>
+  <div class="app-layout">
+    <button class="menu-toggle" onclick="toggleSidebar()" id="menuToggle">&#9776;</button>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>PostgreSQL</h2>
+        <div class="db-info">
+          <span class="db-name"><%= creds.database %></span>
+          <span class="db-user"><%= creds.user %></span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-view="overview" onclick="showView('overview')">
+          <span class="icon">&#9679;</span> Overzicht
+        </button>
+        <button class="nav-btn" data-view="tables" onclick="showView('tables')">
+          <span class="icon">&#9776;</span> Tabellen
+        </button>
+        <button class="nav-btn" data-view="query" onclick="showView('query')">
+          <span class="icon">&#9998;</span> SQL Query
+        </button>
+      </nav>
+      <div class="table-list" id="tableList">
+        <h3>Tabellen</h3>
+        <div id="tableItems"></div>
+      </div>
+      <div class="sidebar-footer">
+        <a href="/databases" class="nav-btn" style="justify-content: center; margin-bottom: 4px;">&#8644; Switch database</a>
+        <a href="/logout" class="logout-btn">Uitloggen</a>
+      </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <main class="main-content">
+      <div id="view-overview" class="view active">
+        <h2>Database Overzicht</h2>
+        <div id="overviewContent" class="overview-grid"></div>
+      </div>
+
+      <div id="view-tables" class="view">
+        <h2>Database Verkenner</h2>
+        <div id="tableContent">
+          <p class="hint">Selecteer een tabel uit de lijst aan de linkerkant.</p>
+        </div>
+      </div>
+
+      <div id="view-query" class="view">
+        <h2>SQL Query</h2>
+        <div class="query-editor">
+          <textarea id="sqlInput" rows="6" placeholder="Voer SQL query in..."></textarea>
+          <button class="btn btn-primary" onclick="executeQuery()">Uitvoeren</button>
+        </div>
+        <div id="queryResult"></div>
+      </div>
+
+    </main>
+  </div>
+<% } %>
+
+<script>
+<% if (view === 'manager') { %>
+let currentTable = null;
+
+function showView(view) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelector(`.nav-btn[data-view="${view}"]`).classList.add('active');
+  if (view === 'overview') loadOverview();
+  if (view === 'tables') loadTables();
+  if (window.innerWidth <= 768) toggleSidebar();
+}
+
+async function loadOverview() {
+  try {
+    const res = await fetch('/dashboard');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    document.getElementById('overviewContent').innerHTML = `
+      <div class="stat-card"><span class="stat-label">Database</span><span class="stat-value">${data.database}</span></div>
+      <div class="stat-card"><span class="stat-label">Gebruiker</span><span class="stat-value">${data.user}</span></div>
+      <div class="stat-card"><span class="stat-label">Host</span><span class="stat-value">localhost</span></div>
+      <div class="stat-card"><span class="stat-label">Grootte</span><span class="stat-value">${data.dbSize}</span></div>
+      <div class="stat-card"><span class="stat-label">Tabellen</span><span class="stat-value">${data.tableCount}</span></div>
+      <div class="stat-card"><span class="stat-label">Actieve connecties</span><span class="stat-value">${data.activeConnections}</span></div>
+    `;
+  } catch (err) {
+    document.getElementById('overviewContent').innerHTML = `<div class="alert error">${err.message}</div>`;
+  }
+}
+
+async function loadTables() {
+  try {
+    const res = await fetch('/tables');
+    const tables = await res.json();
+    if (tables.error) throw new Error(tables.error);
+    const list = document.getElementById('tableItems');
+    list.innerHTML = tables.map(t =>
+      `<a href="#" class="table-item" onclick="return selectTable('${t.table_schema}','${t.table_name}')">
+        <span class="table-icon">&#9632;</span> ${t.table_name}
+        <small>${t.table_schema}</small>
+      </a>`
+    ).join('');
+  } catch (err) {
+    document.getElementById('tableItems').innerHTML = `<div class="alert error">${err.message}</div>`;
+  }
+}
+
+async function selectTable(schema, name) {
+  showView('tables');
+  const container = document.getElementById('tableContent');
+  container.innerHTML = '<div class="loading">Laden...</div>';
+  try {
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const pkCol = data.columns[0]?.column_name || 'id';
+    let html = `<h3>Tabel: ${schema}.${name}</h3>`;
+    html += '<div class="table-wrapper"><table><thead><tr>';
+    data.columns.forEach(c => { html += `<th>${c.column_name}<br><small>${c.data_type}</small></th>`; });
+    html += '<th>Acties</th></tr></thead><tbody>';
+
+    data.rows.forEach(row => {
+      html += '<tr>';
+      data.columns.forEach(c => {
+        const val = row[c.column_name];
+        html += `<td class="cell-editable" contenteditable="true"
+          data-schema="${schema}" data-table="${name}"
+          data-pkcol="${pkCol}" data-pkval="${row[pkCol]}"
+          data-col="${c.column_name}">${val !== null && val !== undefined ? val : '<span class="null">NULL</span>'}</td>`;
+      });
+      html += '<td><button class="btn-sm" onclick="saveRow(this)">Opslaan</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+    currentTable = { schema, name, pkCol };
+  } catch (err) {
+    container.innerHTML = `<div class="alert error">${err.message}</div>`;
+  }
+}
+
+async function saveRow(btn) {
+  const row = btn.closest('tr');
+  const cells = row.querySelectorAll('.cell-editable');
+  const firstCell = cells[0];
+  const schema = firstCell.dataset.schema;
+  const table = firstCell.dataset.table;
+  const pkCol = firstCell.dataset.pkcol;
+  const pkVal = firstCell.dataset.pkval;
+  const updates = {};
+  cells.forEach(cell => {
+    const val = cell.innerText.trim();
+    if (val !== '' && val !== 'NULL') updates[cell.dataset.col] = val;
+  });
+  try {
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(table)}/${encodeURIComponent(pkCol)}/${encodeURIComponent(pkVal)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    btn.textContent = 'Opgeslagen!';
+    setTimeout(() => { btn.textContent = 'Opslaan'; }, 2000);
+  } catch (err) {
+    alert('Fout: ' + err.message);
+  }
+}
+
+async function executeQuery() {
+  const sql = document.getElementById('sqlInput').value;
+  if (!sql.trim()) return;
+  const container = document.getElementById('queryResult');
+  container.innerHTML = '<div class="loading">Uitvoeren...</div>';
+  try {
+    const res = await fetch('/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sql })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    let html = `<div class="query-meta">${data.command} — ${data.rowCount} rij(en) — ${data.duration}ms</div>`;
+    if (data.rows && data.rows.length > 0) {
+      html += '<div class="table-wrapper"><table><thead><tr>';
+      Object.keys(data.rows[0]).forEach(k => { html += `<th>${k}</th>`; });
+      html += '</tr></thead><tbody>';
+      data.rows.forEach(row => {
+        html += '<tr>';
+        Object.values(row).forEach(v => {
+          html += `<td>${v !== null && v !== undefined ? v : '<span class="null">NULL</span>'}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<div class="alert error">${err.message}</div>`;
+  }
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  loadOverview();
+  loadTables();
+});
+<% } %>
+</script>
+</body>
+</html>
