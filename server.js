@@ -920,6 +920,499 @@ app.post('/admin/revoke-db', requireAdminAuth, async (req, res) => {
   }
 });
 
+if (!global.queryHistory) global.queryHistory = [];
+if (!global.queryBookmarks) global.queryBookmarks = [];
+
+app.post('/query/history', requireDb, (req, res) => {
+  const { sql, duration, rowCount, error } = req.body;
+  global.queryHistory.unshift({ sql, duration, rowCount, error, timestamp: Date.now(), database: req.session.credentials.database });
+  if (global.queryHistory.length > 100) global.queryHistory = global.queryHistory.slice(0, 100);
+  res.json({ success: true });
+});
+
+app.get('/query/history', requireDb, (req, res) => {
+  res.json(global.queryHistory);
+});
+
+app.post('/query/bookmark', requireDb, (req, res) => {
+  const { sql, name } = req.body;
+  global.queryBookmarks.push({ sql, name, id: Date.now(), database: req.session.credentials.database });
+  res.json({ success: true });
+});
+
+app.get('/query/bookmarks', requireDb, (req, res) => {
+  res.json(global.queryBookmarks.filter(b => b.database === req.session.credentials.database));
+});
+
+app.delete('/query/bookmark/:id', requireDb, (req, res) => {
+  global.queryBookmarks = global.queryBookmarks.filter(b => b.id !== parseInt(req.params.id));
+  res.json({ success: true });
+});
+
+app.post('/table/create', requireDb, async (req, res) => {
+  const { schema, name, columns } = req.body;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let sql;
+    if (type === 'postgres') {
+      const colDefs = columns.map(c => {
+        let def = `"${c.name}" ${c.type}`;
+        if (c.primaryKey) def += ' PRIMARY KEY';
+        if (c.notNull) def += ' NOT NULL';
+        if (c.default) def += ` DEFAULT ${c.default}`;
+        return def;
+      }).join(', ');
+      sql = `CREATE TABLE "${schema}"."${name}" (${colDefs})`;
+    } else {
+      const colDefs = columns.map(c => {
+        let def = `\`${c.name}\` ${c.type}`;
+        if (c.primaryKey) def += ' PRIMARY KEY';
+        if (c.notNull) def += ' NOT NULL';
+        if (c.default) def += ` DEFAULT ${c.default}`;
+        return def;
+      }).join(', ');
+      sql = `CREATE TABLE \`${schema}\`.\`${name}\` (${colDefs})`;
+    }
+    await queryDb(pool, type, sql, []);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.post('/table/alter', requireDb, async (req, res) => {
+  const { schema, name, action, column, columnType, newColumnName } = req.body;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let sql;
+    if (type === 'postgres') {
+      if (action === 'add') sql = `ALTER TABLE "${schema}"."${name}" ADD COLUMN "${column}" ${columnType}`;
+      else if (action === 'drop') sql = `ALTER TABLE "${schema}"."${name}" DROP COLUMN "${column}"`;
+      else if (action === 'rename') sql = `ALTER TABLE "${schema}"."${name}" RENAME COLUMN "${column}" TO "${newColumnName}"`;
+    } else {
+      if (action === 'add') sql = `ALTER TABLE \`${schema}\`.\`${name}\` ADD COLUMN \`${column}\` ${columnType}`;
+      else if (action === 'drop') sql = `ALTER TABLE \`${schema}\`.\`${name}\` DROP COLUMN \`${column}\``;
+      else if (action === 'rename') sql = `ALTER TABLE \`${schema}\`.\`${name}\` RENAME COLUMN \`${column}\` TO \`${newColumnName}\``;
+    }
+    await queryDb(pool, type, sql, []);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.delete('/table/:schema/:name', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let sql;
+    if (type === 'postgres') sql = `DROP TABLE IF EXISTS "${schema}"."${name}"`;
+    else sql = `DROP TABLE IF EXISTS \`${schema}\`.\`${name}\``;
+    await queryDb(pool, type, sql, []);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.post('/table/import-csv', requireDb, async (req, res) => {
+  const { schema, name, rows, columns } = req.body;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let inserted = 0;
+    for (const row of rows) {
+      const cols = columns.map(c => type === 'postgres' ? `"${c}"` : `\`${c}\``).join(', ');
+      const placeholders = columns.map((_, i) => type === 'postgres' ? `$${i + 1}` : '?').join(', ');
+      const values = columns.map(c => row[c] !== undefined ? row[c] : null);
+      let sql;
+      if (type === 'postgres') sql = `INSERT INTO "${schema}"."${name}" (${cols}) VALUES (${placeholders})`;
+      else sql = `INSERT INTO \`${schema}\`.\`${name}\` (${cols}) VALUES (${placeholders})`;
+      await queryDb(pool, type, sql, values);
+      inserted++;
+    }
+    res.json({ success: true, inserted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.post('/table/:schema/:name/filter', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const { type } = req.session.credentials;
+  const { page = 1, limit = 50, search = '', sortColumn = '', sortDirection = 'ASC' } = req.body;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let columns;
+    if (type === 'postgres') {
+      const cr = await queryDb(pool, type, `SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`, [schema, name]);
+      columns = cr.rows;
+    } else {
+      const cr = await queryDb(pool, type, `SELECT COLUMN_NAME as column_name, DATA_TYPE as data_type, IS_NULLABLE as is_nullable, COLUMN_DEFAULT as column_default FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position`, [schema, name]);
+      columns = cr[0];
+    }
+    let whereClause = '';
+    let params = [];
+    if (search) {
+      const searchConditions = columns.map((c, i) => {
+        if (type === 'postgres') {
+          return `"${c.column_name}"::text ILIKE $${i + 1}`;
+        } else {
+          return `CAST(\`${c.column_name}\` AS CHAR) LIKE ?`;
+        }
+      }).join(' OR ');
+      whereClause = ` WHERE ${searchConditions}`;
+      params = columns.map(() => type === 'postgres' ? `%${search}%` : `%${search}%`);
+    }
+    let orderBy = '';
+    if (sortColumn) {
+      const dir = sortDirection.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+      if (type === 'postgres') orderBy = ` ORDER BY "${sortColumn}" ${dir}`;
+      else orderBy = ` ORDER BY \`${sortColumn}\` ${dir}`;
+    }
+    const offset = (page - 1) * limit;
+    let countSql, dataSql;
+    if (type === 'postgres') {
+      countSql = `SELECT COUNT(*) FROM "${schema}"."${name}"${whereClause}`;
+      dataSql = `SELECT * FROM "${schema}"."${name}"${whereClause}${orderBy} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    } else {
+      countSql = `SELECT COUNT(*) as count FROM \`${schema}\`.\`${name}\`${whereClause}`;
+      dataSql = `SELECT * FROM \`${schema}\`.\`${name}\`${whereClause}${orderBy} LIMIT ? OFFSET ?`;
+    }
+    const countParams = type === 'postgres' ? [...params] : [...params];
+    const cr = await queryDb(pool, type, countSql, countParams);
+    const total = type === 'postgres' ? parseInt(cr.rows[0].count) : cr[0][0].count;
+    const dataParams = type === 'postgres' ? [...params, limit, offset] : [...params, limit, offset];
+    const dr = await queryDb(pool, type, dataSql, dataParams);
+    const data = type === 'postgres' ? dr.rows : dr[0];
+    res.json({ columns, rows: data, total, page, limit, totalPages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.post('/sql/format', requireDb, (req, res) => {
+  const { sql } = req.body;
+  if (!sql || !sql.trim()) return res.json({ formatted: '' });
+  const keywords = ['SELECT','FROM','WHERE','AND','OR','ORDER BY','GROUP BY','HAVING','LIMIT','OFFSET','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','OUTER JOIN','FULL JOIN','CROSS JOIN','ON','AS','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM','CREATE TABLE','ALTER TABLE','DROP TABLE','CREATE INDEX','DROP INDEX','UNION','UNION ALL','EXCEPT','INTERSECT','CASE','WHEN','THEN','ELSE','END','IN','NOT','NULL','IS','LIKE','BETWEEN','EXISTS','DISTINCT','COUNT','SUM','AVG','MIN','MAX','ASC','DESC'];
+  let formatted = sql.trim();
+  keywords.forEach(kw => {
+    const regex = new RegExp(`\\b${kw}\\b`, 'gi');
+    formatted = formatted.replace(regex, kw);
+  });
+  formatted = formatted.replace(/\b(SELECT)\b/gi, 'SELECT\n  ');
+  formatted = formatted.replace(/\b(FROM)\b/gi, '\nFROM\n  ');
+  formatted = formatted.replace(/\b(WHERE)\b/gi, '\nWHERE\n  ');
+  formatted = formatted.replace(/\b(AND)\b/gi, '\n  AND ');
+  formatted = formatted.replace(/\b(OR)\b/gi, '\n  OR ');
+  formatted = formatted.replace(/\b(ORDER BY)\b/gi, '\nORDER BY ');
+  formatted = formatted.replace(/\b(GROUP BY)\b/gi, '\nGROUP BY ');
+  formatted = formatted.replace(/\b(HAVING)\b/gi, '\nHAVING ');
+  formatted = formatted.replace(/\b(LIMIT)\b/gi, '\nLIMIT ');
+  formatted = formatted.replace(/\b(OFFSET)\b/gi, '\nOFFSET ');
+  formatted = formatted.replace(/\b(LEFT JOIN|RIGHT JOIN|INNER JOIN|JOIN)\b/gi, '\n$1 ');
+  formatted = formatted.replace(/\b(ON)\b/gi, '\n  ON ');
+  formatted = formatted.replace(/\b(INSERT INTO)\b/gi, 'INSERT INTO ');
+  formatted = formatted.replace(/\b(VALUES)\b/gi, '\nVALUES ');
+  formatted = formatted.replace(/\b(UPDATE)\b/gi, 'UPDATE ');
+  formatted = formatted.replace(/\b(SET)\b/gi, '\nSET ');
+  formatted = formatted.replace(/\b(DELETE FROM)\b/gi, 'DELETE FROM ');
+  formatted = formatted.replace(/,\s*/g, ',\n  ');
+  formatted = formatted.replace(/\n\s*\n/g, '\n');
+  res.json({ formatted });
+});
+
+app.get('/table/:schema/:name/structure', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let columns, ddl;
+    if (type === 'postgres') {
+      const cr = await queryDb(pool, type, `SELECT column_name, data_type, character_maximum_length, is_nullable, column_default, is_identity, numeric_precision, numeric_scale FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`, [schema, name]);
+      columns = cr.rows;
+      const pk = await queryDb(pool, type, `SELECT kcu.column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name WHERE tc.table_schema = $1 AND tc.table_name = $2 AND tc.constraint_type = 'PRIMARY KEY'`, [schema, name]);
+      const pkCols = pk.rows.map(r => r.column_name);
+      const indexes = await queryDb(pool, type, `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = $1 AND tablename = $2`, [schema, name]);
+      const fk = await queryDb(pool, type, `SELECT kcu.column_name, ccu.table_schema AS foreign_table_schema, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = $1 AND tc.table_name = $2`, [schema, name]);
+      let colDefs = columns.map(c => {
+        let def = `  "${c.column_name}" ${c.data_type}`;
+        if (c.character_maximum_length) def += `(${c.character_maximum_length})`;
+        if (c.is_nullable === 'NO') def += ' NOT NULL';
+        if (c.column_default) def += ` DEFAULT ${c.column_default}`;
+        if (pkCols.includes(c.column_name)) def += ' PRIMARY KEY';
+        return def;
+      }).join(',\n');
+      ddl = `CREATE TABLE "${schema}"."${name}" (\n${colDefs}\n);\n\n`;
+      indexes.rows.forEach(idx => { ddl += `${idx.indexdef};\n`; });
+      fk.rows.forEach(f => {
+        ddl += `ALTER TABLE "${schema}"."${name}" ADD FOREIGN KEY ("${f.column_name}") REFERENCES "${f.foreign_table_schema}"."${f.foreign_table_name}" ("${f.foreign_column_name}");\n`;
+      });
+    } else {
+      const cr = await queryDb(pool, type, `SELECT COLUMN_NAME as column_name, DATA_TYPE as data_type, CHARACTER_MAXIMUM_LENGTH as character_maximum_length, IS_NULLABLE as is_nullable, COLUMN_DEFAULT as column_default, COLUMN_KEY as column_key FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position`, [schema, name]);
+      columns = cr[0];
+      let colDefs = columns.map(c => {
+        let def = `  \`${c.column_name}\` ${c.data_type}`;
+        if (c.character_maximum_length) def += `(${c.character_maximum_length})`;
+        if (c.is_nullable === 'NO') def += ' NOT NULL';
+        if (c.column_default) def += ` DEFAULT ${c.column_default}`;
+        if (c.column_key === 'PRI') def += ' PRIMARY KEY';
+        return def;
+      }).join(',\n');
+      ddl = `CREATE TABLE \`${schema}\`.\`${name}\` (\n${colDefs}\n);`;
+    }
+    res.json({ columns, ddl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.get('/table/:schema/:name/indexes', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let indexes;
+    if (type === 'postgres') {
+      const r = await queryDb(pool, type, `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = $1 AND tablename = $2 ORDER BY indexname`, [schema, name]);
+      indexes = r.rows;
+    } else {
+      const r = await queryDb(pool, type, `SELECT INDEX_NAME as indexname, COLUMN_NAME as column_name, NON_UNIQUE as non_unique, SEQ_IN_INDEX as seq_in_index FROM information_schema.statistics WHERE table_schema = ? AND table_name = ? ORDER BY indexname, seq_in_index`, [schema, name]);
+      const idxMap = {};
+      r[0].forEach(row => {
+        if (!idxMap[row.indexname]) idxMap[row.indexname] = { indexname: row.indexname, columns: [], non_unique: row.non_unique };
+        idxMap[row.indexname].columns.push(row.column_name);
+      });
+      indexes = Object.values(idxMap).map(i => ({ indexname: i.indexname, indexdef: `CREATE ${i.non_unique ? '' : 'UNIQUE '}INDEX \`${i.indexname}\` ON \`${name}\` (${i.columns.map(c => `\`${c}\``).join(', ')})` }));
+    }
+    res.json(indexes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.post('/table/:schema/:name/index', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const { indexName, columns, unique } = req.body;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let sql;
+    const uniqueStr = unique ? 'UNIQUE ' : '';
+    if (type === 'postgres') {
+      const colStr = columns.map(c => `"${c}"`).join(', ');
+      sql = `CREATE ${uniqueStr}INDEX "${indexName}" ON "${schema}"."${name}" (${colStr})`;
+    } else {
+      const colStr = columns.map(c => `\`${c}\``).join(', ');
+      sql = `CREATE ${uniqueStr}INDEX \`${indexName}\` ON \`${schema}\`.\`${name}\` (${colStr})`;
+    }
+    await queryDb(pool, type, sql, []);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.delete('/table/:schema/:name/index/:indexName', requireDb, async (req, res) => {
+  const { schema, name, indexName } = req.params;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let sql;
+    if (type === 'postgres') sql = `DROP INDEX IF EXISTS "${schema}"."${indexName}"`;
+    else sql = `DROP INDEX IF EXISTS \`${indexName}\` ON \`${schema}\`.\`${name}\``;
+    await queryDb(pool, type, sql, []);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.get('/monitor/connections', requireDb, async (req, res) => {
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let data;
+    if (type === 'postgres') {
+      const r = await queryDb(pool, type, `SELECT state, count(*) as count FROM pg_stat_activity GROUP BY state ORDER BY state`, []);
+      const total = await queryDb(pool, type, `SELECT count(*) as total FROM pg_stat_activity`, []);
+      const max = await queryDb(pool, type, `SHOW max_connections`, []);
+      data = { states: r.rows, total: total.rows[0].total, max: max.rows[0].max_connections };
+    } else {
+      const r = await queryDb(pool, type, `SELECT COUNT(*) as total FROM information_schema.processlist`, []);
+      const max = await queryDb(pool, type, `SHOW VARIABLES LIKE 'max_connections'`, []);
+      data = { total: r[0][0].total, max: max[0][0].Value };
+    }
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.get('/monitor/history', requireDb, (req, res) => {
+  if (!global.monitorHistory) global.monitorHistory = [];
+  res.json(global.monitorHistory.slice(-60));
+});
+
+app.get('/table/:schema/:name/relations', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let relations;
+    if (type === 'postgres') {
+      const r = await queryDb(pool, type, `SELECT tc.constraint_name, kcu.column_name, ccu.table_schema AS foreign_table_schema, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = $1 AND tc.table_name = $2`, [schema, name]);
+      relations = r.rows;
+    } else {
+      const r = await queryDb(pool, type, `SELECT kcu.column_name, kcu.referenced_table_schema AS foreign_table_schema, kcu.referenced_table_name AS foreign_table_name, kcu.referenced_column_name AS foreign_column_name FROM information_schema.key_column_usage kcu WHERE kcu.table_schema = ? AND kcu.table_name = ? AND kcu.referenced_table_name IS NOT NULL`, [schema, name]);
+      relations = r[0];
+    }
+    res.json(relations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.get('/tables/relations', requireDb, async (req, res) => {
+  const { type, database } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let tables, relations;
+    if (type === 'postgres') {
+      const tr = await queryDb(pool, type, `SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND table_type = 'BASE TABLE' ORDER BY table_schema, table_name`, []);
+      tables = tr.rows;
+      const rr = await queryDb(pool, type, `SELECT tc.table_schema, tc.table_name, kcu.column_name, ccu.table_schema AS foreign_table_schema, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema NOT IN ('pg_catalog', 'information_schema')`, []);
+      relations = rr.rows;
+    } else {
+      const tr = await queryDb(pool, type, `SELECT TABLE_SCHEMA as table_schema, TABLE_NAME as table_name FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys') AND table_type = 'BASE TABLE' ORDER BY table_schema, table_name`, []);
+      tables = tr[0];
+      const rr = await queryDb(pool, type, `SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.referenced_table_schema AS foreign_table_schema, kcu.referenced_table_name AS foreign_table_name, kcu.referenced_column_name AS foreign_column_name FROM information_schema.key_column_usage kcu WHERE kcu.referenced_table_name IS NOT NULL AND kcu.table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')`, []);
+      relations = rr[0];
+    }
+    res.json({ tables, relations });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.post('/table/:schema/:name/bulk-delete', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const { pkCol, pkValues } = req.body;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let sql;
+    if (type === 'postgres') {
+      const placeholders = pkValues.map((_, i) => `$${i + 1}`).join(', ');
+      sql = `DELETE FROM "${schema}"."${name}" WHERE "${pkCol}" IN (${placeholders})`;
+    } else {
+      const placeholders = pkValues.map(() => '?').join(', ');
+      sql = `DELETE FROM \`${schema}\`.\`${name}\` WHERE \`${pkCol}\` IN (${placeholders})`;
+    }
+    const r = await queryDb(pool, type, sql, pkValues);
+    const deleted = type === 'postgres' ? r.rowCount : r[0].affectedRows;
+    res.json({ success: true, deleted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.post('/query/explain', requireDb, async (req, res) => {
+  const { sql } = req.body;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let result;
+    if (type === 'postgres') {
+      const r = await queryDb(pool, type, `EXPLAIN (FORMAT JSON, ANALYZE) ${sql}`, []);
+      result = r.rows;
+    } else {
+      const r = await queryDb(pool, type, `EXPLAIN FORMAT=JSON ${sql}`, []);
+      result = r[0];
+    }
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
+app.get('/table/:schema/:name/export-sql', requireDb, async (req, res) => {
+  const { schema, name } = req.params;
+  const { type } = req.session.credentials;
+  const pool = createPool(type, req.session.credentials);
+  try {
+    let structure, data;
+    if (type === 'postgres') {
+      const sr = await queryDb(pool, type, `SELECT column_name, data_type, character_maximum_length, is_nullable, column_default FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`, [schema, name]);
+      structure = sr.rows;
+      const dr = await queryDb(pool, type, `SELECT * FROM "${schema}"."${name}"`, []);
+      data = dr.rows;
+    } else {
+      const sr = await queryDb(pool, type, `SELECT COLUMN_NAME as column_name, DATA_TYPE as data_type, CHARACTER_MAXIMUM_LENGTH as character_maximum_length, IS_NULLABLE as is_nullable, COLUMN_DEFAULT as column_default FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position`, [schema, name]);
+      structure = sr[0];
+      const dr = await queryDb(pool, type, `SELECT * FROM \`${schema}\`.\`${name}\``, []);
+      data = dr[0];
+    }
+    const colDefs = structure.map(c => {
+      let def = `"${c.column_name}" ${c.data_type}`;
+      if (c.character_maximum_length) def += `(${c.character_maximum_length})`;
+      if (c.is_nullable === 'NO') def += ' NOT NULL';
+      if (c.column_default) def += ` DEFAULT ${c.column_default}`;
+      return def;
+    }).join(', ');
+    let sql = `-- Export: ${schema}.${name}\n`;
+    sql += `-- Generated: ${new Date().toISOString()}\n\n`;
+    sql += `CREATE TABLE "${schema}"."${name}" (\n  ${colDefs}\n);\n\n`;
+    for (const row of data) {
+      const cols = Object.keys(row).map(c => `"${c}"`).join(', ');
+      const vals = Object.values(row).map(v => {
+        if (v === null || v === undefined) return 'NULL';
+        if (typeof v === 'number') return v;
+        return `'${String(v).replace(/'/g, "''")}'`;
+      }).join(', ');
+      sql += `INSERT INTO "${schema}"."${name}" (${cols}) VALUES (${vals});\n`;
+    }
+    res.setHeader('Content-Type', 'application/sql; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}.sql"`);
+    res.send(sql);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    await endPool(pool, type);
+  }
+});
+
 app.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   console.log(`Database Manager running on http://0.0.0.0:${PORT}`);
 });

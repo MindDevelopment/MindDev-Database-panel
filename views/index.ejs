@@ -673,11 +673,15 @@ window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
 </script>
 
 <% } else if (view === 'manager') { %>
-  <div class="app-layout">
+  <div id="toastContainer" class="toast-container"></div>
+  <div class="app-layout" id="appLayout">
     <button class="menu-toggle" onclick="toggleSidebar()" id="menuToggle">&#9776;</button>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <h2><%= (creds.type || 'postgres').charAt(0).toUpperCase() + (creds.type || 'postgres').slice(1) %></h2>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <h2><%= (creds.type || 'postgres').charAt(0).toUpperCase() + (creds.type || 'postgres').slice(1) %></h2>
+          <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Toggle theme"><i class="lucide-moon"></i></button>
+        </div>
         <div class="db-type-badge"><%= creds.type || 'postgres' %></div>
         <div class="db-info">
           <span class="db-name"><%= creds.database %></span>
@@ -694,9 +698,18 @@ window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
         <button class="nav-btn" data-view="query" onclick="showView('query')">
           <span class="icon"><i class="lucide-terminal"></i></span> SQL Query
         </button>
+        <button class="nav-btn" data-view="monitor" onclick="showView('monitor')">
+          <span class="icon"><i class="lucide-activity"></i></span> Monitor
+        </button>
+        <button class="nav-btn" data-view="erd" onclick="showView('erd')">
+          <span class="icon"><i class="lucide-git-branch"></i></span> ER Diagram
+        </button>
       </nav>
       <div class="table-list" id="tableList">
-        <h3>Tables</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <h3>Tables</h3>
+          <button class="btn-icon" onclick="showCreateTableModal()" title="Create table"><i class="lucide-plus"></i></button>
+        </div>
         <div id="tableItems"></div>
       </div>
       <div class="sidebar-footer">
@@ -710,6 +723,10 @@ window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
       <div id="view-overview" class="view active">
         <h2>Database Overview</h2>
         <div id="overviewContent" class="overview-grid"></div>
+        <div style="margin-top:24px">
+          <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)">Connection History</h3>
+          <div class="chart-container" id="connectionChart"></div>
+        </div>
       </div>
 
       <div id="view-tables" class="view">
@@ -720,21 +737,100 @@ window.addEventListener('DOMContentLoaded', () => { showAdminTab2('users'); });
       </div>
 
       <div id="view-query" class="view">
-        <h2>SQL Query</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h2 style="margin-bottom:0">SQL Query</h2>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="showQueryHistory()" style="background:rgba(59,130,246,0.1);color:var(--accent)"><i class="lucide-history"></i> History</button>
+            <button class="btn btn-sm" onclick="showQueryBookmarks()" style="background:rgba(245,158,11,0.1);color:var(--warning)"><i class="lucide-bookmark"></i> Bookmarks</button>
+          </div>
+        </div>
+        <div class="query-tabs" id="queryTabs">
+          <div class="query-tab active" data-tab="0" onclick="switchQueryTab(0)">Query 1 <span class="query-tab-close" onclick="event.stopPropagation();closeQueryTab(0)">&times;</span></div>
+          <button class="query-tab-add" onclick="addQueryTab()"><i class="lucide-plus"></i></button>
+        </div>
         <div class="query-editor">
-          <textarea id="sqlInput" rows="6" placeholder="Enter SQL query..."></textarea>
-          <button class="btn btn-primary" onclick="executeQuery()"><i class="lucide-play" style="margin-right:4px"></i> Execute</button>
+          <div class="query-toolbar">
+            <button class="btn btn-sm" onclick="formatSQL()" title="Format SQL"><i class="lucide-align-left"></i> Format</button>
+            <button class="btn btn-sm" onclick="saveBookmark()" title="Save bookmark"><i class="lucide-bookmark-plus"></i> Save</button>
+            <button class="btn btn-sm" onclick="showExplain()" title="EXPLAIN"><i class="lucide-zap"></i> Explain</button>
+            <button class="btn btn-sm" onclick="clearEditor()" title="Clear"><i class="lucide-eraser"></i> Clear</button>
+          </div>
+          <div class="autocomplete-wrapper">
+            <textarea id="sqlInput" rows="8" placeholder="Enter SQL query..." onkeydown="handleQueryKeydown(event)"></textarea>
+            <div id="autocompleteDropdown" class="autocomplete-dropdown"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-primary" onclick="executeQuery()" style="width:auto"><i class="lucide-play" style="margin-right:4px"></i> Execute (Ctrl+Enter)</button>
+          </div>
         </div>
         <div id="queryResult"></div>
       </div>
 
+      <div id="view-monitor" class="view">
+        <h2>Connection Monitor</h2>
+        <div id="monitorContent" class="overview-grid"></div>
+        <div style="margin-top:24px">
+          <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)">Connection History (last 60 reads)</h3>
+          <div class="chart-container" id="monitorChart"></div>
+        </div>
+      </div>
+
+      <div id="view-erd" class="view">
+        <h2>ER Diagram</h2>
+        <div id="erdContent" class="erd-canvas"></div>
+      </div>
     </main>
+  </div>
+
+  <div id="modalOverlay" class="modal-overlay" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modalTitle">Modal</h3>
+        <button class="btn-icon" onclick="closeModal()"><i class="lucide-x"></i></button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
   </div>
 <% } %>
 
 <script>
 <% if (view === 'manager') { %>
 let currentTable = null;
+let queryTabs = [{ sql: '', result: '' }];
+let activeQueryTab = 0;
+let tableColumns = [];
+let currentPage = 1;
+let currentSort = { column: '', direction: 'ASC' };
+let currentSearch = '';
+let selectedRows = new Set();
+let monitorInterval = null;
+let connectionHistory = [];
+let tableAutocomplete = [];
+
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  const icons = { success: 'check-circle', error: 'x-circle', info: 'info', warning: 'alert-triangle' };
+  toast.innerHTML = `<i class="lucide-${icons[type] || 'info'}"></i> ${message}`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.classList.add('show'); }, 10);
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+function toggleTheme() {
+  const layout = document.getElementById('appLayout');
+  const isDark = !layout.classList.contains('light-theme');
+  if (isDark) {
+    layout.classList.add('light-theme');
+    document.getElementById('themeToggle').innerHTML = '<i class="lucide-sun"></i>';
+    localStorage.setItem('theme', 'light');
+  } else {
+    layout.classList.remove('light-theme');
+    document.getElementById('themeToggle').innerHTML = '<i class="lucide-moon"></i>';
+    localStorage.setItem('theme', 'dark');
+  }
+}
 
 function showView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -743,6 +839,9 @@ function showView(view) {
   document.querySelector(`.nav-btn[data-view="${view}"]`).classList.add('active');
   if (view === 'overview') loadOverview();
   if (view === 'tables') loadTables();
+  if (view === 'query') loadAutocomplete();
+  if (view === 'monitor') loadMonitor();
+  if (view === 'erd') loadERD();
   if (window.innerWidth <= 768) toggleSidebar();
 }
 
@@ -754,13 +853,97 @@ async function loadOverview() {
     document.getElementById('overviewContent').innerHTML = `
       <div class="stat-card"><span class="stat-label">Database</span><span class="stat-value">${data.database}</span></div>
       <div class="stat-card"><span class="stat-label">User</span><span class="stat-value">${data.user}</span></div>
-      <div class="stat-card"><span class="stat-label">Host</span><span class="stat-value">localhost</span></div>
+      <div class="stat-card"><span class="stat-label">Host</span><span class="stat-value">${data.host || 'localhost'}</span></div>
       <div class="stat-card"><span class="stat-label">Size</span><span class="stat-value">${data.dbSize}</span></div>
       <div class="stat-card"><span class="stat-label">Tables</span><span class="stat-value">${data.tableCount}</span></div>
       <div class="stat-card"><span class="stat-label">Active connections</span><span class="stat-value">${data.activeConnections}</span></div>
     `;
+    loadConnectionChart();
   } catch (err) {
     document.getElementById('overviewContent').innerHTML = `<div class="alert error">${err.message}</div>`;
+  }
+}
+
+async function loadConnectionChart() {
+  try {
+    const res = await fetch('/monitor/connections');
+    const data = await res.json();
+    connectionHistory.push({ time: new Date().toLocaleTimeString(), total: parseInt(data.total) || 0 });
+    if (connectionHistory.length > 20) connectionHistory.shift();
+    const chart = document.getElementById('connectionChart');
+    const max = Math.max(...connectionHistory.map(h => h.total), 1);
+    chart.innerHTML = `<div class="bar-chart">${connectionHistory.map(h => `<div class="bar-col"><div class="bar" style="height:${(h.total/max)*100}%"></div><span class="bar-label">${h.time.split(':').slice(0,2).join(':')}</span></div>`).join('')}</div>`;
+  } catch(e) {}
+}
+
+async function loadMonitor() {
+  try {
+    const res = await fetch('/monitor/connections');
+    const data = await res.json();
+    let html = `<div class="stat-card"><span class="stat-label">Total connections</span><span class="stat-value">${data.total || 0}</span></div>`;
+    html += `<div class="stat-card"><span class="stat-label">Max connections</span><span class="stat-value">${data.max || '?'}</span></div>`;
+    if (data.states) {
+      data.states.forEach(s => {
+        html += `<div class="stat-card"><span class="stat-label">${s.state || 'unknown'}</span><span class="stat-value">${s.count}</span></div>`;
+      });
+    }
+    document.getElementById('monitorContent').innerHTML = html;
+    const chart = document.getElementById('monitorChart');
+    const max = Math.max(parseInt(data.total) || 0, parseInt(data.max) || 1);
+    const pct = ((parseInt(data.total) || 0) / max * 100).toFixed(1);
+    chart.innerHTML = `
+      <div style="padding:20px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="color:var(--text-secondary);font-size:13px">Connection usage</span>
+          <span style="color:var(--text-primary);font-weight:600;font-family:'JetBrains Mono',monospace">${pct}%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pct > 80 ? 'var(--danger)' : pct > 60 ? 'var(--warning)' : 'var(--accent)'}"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--text-muted)">
+          <span>${data.total || 0} active</span><span>${data.max || '?'} max</span>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    document.getElementById('monitorContent').innerHTML = `<div class="alert error">${err.message}</div>`;
+  }
+}
+
+async function loadERD() {
+  const container = document.getElementById('erdContent');
+  container.innerHTML = '<div class="loading">Loading diagram...</div>';
+  try {
+    const res = await fetch('/tables/relations');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (data.tables.length === 0) { container.innerHTML = '<p class="hint">No tables found.</p>'; return; }
+    const tableMap = {};
+    data.tables.forEach(t => {
+      const key = `${t.table_schema}.${t.table_name}`;
+      if (!tableMap[key]) tableMap[key] = { name: t.table_name, schema: t.table_schema, columns: [], relations: [] };
+    });
+    data.relations.forEach(r => {
+      const from = `${r.table_schema}.${r.table_name}`;
+      const to = `${r.foreign_table_schema}.${r.foreign_table_name}`;
+      if (tableMap[from]) tableMap[from].relations.push({ column: r.column_name, targetTable: r.foreign_table_name, targetColumn: r.foreign_column_name });
+    });
+    let html = '<div class="erd-grid">';
+    Object.entries(tableMap).forEach(([key, t]) => {
+      html += `<div class="erd-table-card">
+        <div class="erd-table-header"><i class="lucide-table-2"></i> ${t.name}</div>
+        <div class="erd-table-body">`;
+      if (t.relations.length > 0) {
+        t.relations.forEach(r => {
+          html += `<div class="erd-relation"><span class="erd-col">${r.column}</span> <i class="lucide-arrow-right"></i> ${r.targetTable}(${r.targetColumn})</div>`;
+        });
+      } else {
+        html += `<div style="color:var(--text-muted);font-size:12px;padding:4px 0">No relations</div>`;
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<div class="alert error">${err.message}</div>`;
   }
 }
 
@@ -781,40 +964,295 @@ async function loadTables() {
   }
 }
 
+async function loadAutocomplete() {
+  try {
+    const res = await fetch('/tables');
+    const tables = await res.json();
+    tableAutocomplete = tables.map(t => t.table_name);
+    for (const t of tables) {
+      const r = await fetch(`/table/${encodeURIComponent(t.table_schema)}/${encodeURIComponent(t.table_name)}/structure`);
+      const d = await r.json();
+      if (d.columns) d.columns.forEach(c => tableAutocomplete.push(c.column_name));
+    }
+  } catch(e) {}
+}
+
 async function selectTable(schema, name) {
   showView('tables');
+  currentPage = 1;
+  currentSort = { column: '', direction: 'ASC' };
+  currentSearch = '';
+  selectedRows.clear();
+  await loadTableData(schema, name);
+}
+
+async function loadTableData(schema, name) {
   const container = document.getElementById('tableContent');
   container.innerHTML = '<div class="loading">Loading...</div>';
   try {
-    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}`);
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/filter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: currentPage, limit: 50, search: currentSearch, sortColumn: currentSort.column, sortDirection: currentSort.direction })
+    });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-
+    tableColumns = data.columns;
     const pkCol = data.columns[0]?.column_name || 'id';
-    let html = `<h3>Table: ${schema}.${name}</h3>`;
-    html += `<div style="margin-bottom:10px"><button class="btn btn-sm" onclick="exportCSV('${schema}','${name}')" style="background:#2a6a3a"><i class="lucide-download" style="margin-right:4px"></i> Export CSV</button></div>`;
-    html += '<div class="table-wrapper"><table><thead><tr>';
-    data.columns.forEach(c => { html += `<th>${c.column_name}<br><small>${c.data_type}</small></th>`; });
+    let html = `<div class="table-header-bar">
+      <h3 style="margin:0">Table: ${schema}.${name}</h3>
+      <div class="table-actions-bar">
+        <div class="search-box">
+          <i class="lucide-search"></i>
+          <input type="text" id="tableSearch" placeholder="Search..." value="${currentSearch}" onkeyup="handleTableSearch(event, '${schema}', '${name}')">
+        </div>
+        <button class="btn btn-sm" onclick="showTableStructure('${schema}','${name}')"><i class="lucide-info"></i> Structure</button>
+        <button class="btn btn-sm" onclick="showIndexPanel('${schema}','${name}')"><i class="lucide-key"></i> Indexes</button>
+        <button class="btn btn-sm" onclick="showImportCSV('${schema}','${name}')"><i class="lucide-upload"></i> Import CSV</button>
+        <button class="btn btn-sm" onclick="exportCSV('${schema}','${name}')" style="background:rgba(34,197,94,0.15);color:var(--success)"><i class="lucide-download"></i> CSV</button>
+        <button class="btn btn-sm" onclick="exportSQL('${schema}','${name}')" style="background:rgba(139,92,246,0.15);color:#a78bfa"><i class="lucide-file-code"></i> SQL</button>
+        <button class="btn btn-sm" onclick="confirmDeleteTable('${schema}','${name}')" style="background:var(--danger-bg);color:var(--danger)"><i class="lucide-trash-2"></i> Drop</button>
+      </div>
+    </div>`;
+    if (selectedRows.size > 0) {
+      html += `<div class="bulk-actions"><span>${selectedRows.size} row(s) selected</span><button class="btn btn-sm" onclick="bulkDelete('${schema}','${name}','${pkCol}')" style="background:var(--danger);color:#fff"><i class="lucide-trash-2"></i> Delete selected</button><button class="btn btn-sm" onclick="clearSelection()" style="background:rgba(51,65,85,0.5)">Clear</button></div>`;
+    }
+    html += '<div class="table-wrapper"><table><thead><tr><th style="width:30px"><input type="checkbox" onchange="toggleAllRows(this)"></th>';
+    data.columns.forEach(c => {
+      const sortIcon = currentSort.column === c.column_name ? (currentSort.direction === 'ASC' ? '<i class="lucide-chevron-up"></i>' : '<i class="lucide-chevron-down"></i>') : '';
+      html += `<th style="cursor:pointer" onclick="sortTable('${schema}','${name}','${c.column_name}')">${c.column_name} ${sortIcon}<br><small>${c.data_type}</small></th>`;
+    });
     html += '<th>Actions</th></tr></thead><tbody>';
-
     data.rows.forEach(row => {
-      html += '<tr>';
+      const pkVal = row[pkCol];
+      const isSelected = selectedRows.has(String(pkVal));
+      html += `<tr class="${isSelected ? 'row-selected' : ''}"><td><input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRow('${pkVal}', this)"></td>`;
       data.columns.forEach(c => {
         const val = row[c.column_name];
         html += `<td class="cell-editable" contenteditable="true"
           data-schema="${schema}" data-table="${name}"
-          data-pkcol="${pkCol}" data-pkval="${row[pkCol]}"
+          data-pkcol="${pkCol}" data-pkval="${pkVal}"
           data-col="${c.column_name}">${val !== null && val !== undefined ? val : '<span class="null">NULL</span>'}</td>`;
       });
       html += '<td><button class="btn-sm" onclick="saveRow(this)"><i class="lucide-check" style="margin-right:3px"></i> Save</button></td>';
       html += '</tr>';
     });
     html += '</tbody></table></div>';
+    if (data.totalPages > 1) {
+      html += `<div class="pagination"><button class="btn btn-sm" onclick="changePage('${schema}','${name}',${currentPage-1})" ${currentPage<=1?'disabled':''}><i class="lucide-chevron-left"></i></button>`;
+      html += `<span class="pagination-info">Page ${data.page} of ${data.totalPages} (${data.total} rows)</span>`;
+      html += `<button class="btn btn-sm" onclick="changePage('${schema}','${name}',${currentPage+1})" ${currentPage>=data.totalPages?'disabled':''}><i class="lucide-chevron-right"></i></button></div>`;
+    } else {
+      html += `<div class="pagination"><span class="pagination-info">${data.total} row(s)</span></div>`;
+    }
     container.innerHTML = html;
     currentTable = { schema, name, pkCol };
   } catch (err) {
     container.innerHTML = `<div class="alert error">${err.message}</div>`;
   }
+}
+
+function toggleRow(pkVal, checkbox) {
+  if (checkbox.checked) selectedRows.add(String(pkVal));
+  else selectedRows.delete(String(pkVal));
+  if (currentTable) loadTableData(currentTable.schema, currentTable.name);
+}
+
+function toggleAllRows(checkbox) {
+  document.querySelectorAll('.table-wrapper tbody input[type="checkbox"]').forEach(cb => {
+    cb.checked = checkbox.checked;
+    const pkVal = cb.closest('tr').querySelector('.cell-editable')?.dataset.pkval;
+    if (pkVal) { if (checkbox.checked) selectedRows.add(String(pkVal)); else selectedRows.delete(String(pkVal)); }
+  });
+  if (currentTable) loadTableData(currentTable.schema, currentTable.name);
+}
+
+function clearSelection() { selectedRows.clear(); if (currentTable) loadTableData(currentTable.schema, currentTable.name); }
+
+async function bulkDelete(schema, name, pkCol) {
+  if (!confirm(`Delete ${selectedRows.size} row(s)?`)) return;
+  try {
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pkCol, pkValues: Array.from(selectedRows) })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast(`Deleted ${data.deleted} row(s)`);
+    selectedRows.clear();
+    loadTableData(schema, name);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+function handleTableSearch(event, schema, name) {
+  if (event.key === 'Enter') {
+    currentSearch = document.getElementById('tableSearch').value;
+    currentPage = 1;
+    loadTableData(schema, name);
+  }
+}
+
+function sortTable(schema, name, column) {
+  if (currentSort.column === column) currentSort.direction = currentSort.direction === 'ASC' ? 'DESC' : 'ASC';
+  else { currentSort.column = column; currentSort.direction = 'ASC'; }
+  loadTableData(schema, name);
+}
+
+function changePage(schema, name, page) { currentPage = page; loadTableData(schema, name); }
+
+async function showTableStructure(schema, name) {
+  try {
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/structure`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    let html = '<div class="structure-view">';
+    html += '<h4 style="color:var(--text-primary);margin-bottom:12px">Columns</h4>';
+    html += '<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>Nullable</th><th>Default</th></tr></thead><tbody>';
+    data.columns.forEach(c => {
+      html += `<tr><td><strong>${c.column_name}</strong></td><td><code>${c.data_type}</code></td><td>${c.is_nullable}</td><td>${c.column_default || '-'}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    html += '<h4 style="color:var(--text-primary);margin:16px 0 12px">DDL</h4>';
+    html += `<pre class="ddl-code">${data.ddl}</pre>`;
+    html += '<div style="margin-top:16px"><h4 style="color:var(--text-primary);margin-bottom:12px">Alter table</h4>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    html += '<button class="btn btn-sm" onclick="showAddColumnModal(\''+schema+'\',\''+name+'\')"><i class="lucide-plus"></i> Add column</button>';
+    html += '<button class="btn btn-sm" onclick="showDropColumnModal(\''+schema+'\',\''+name+'\')" style="background:var(--danger-bg);color:var(--danger)"><i class="lucide-trash-2"></i> Drop column</button>';
+    html += '</div></div></div>';
+    openModal('Table Structure: ' + schema + '.' + name, html);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+function showAddColumnModal(schema, name) {
+  const html = `<div class="form-group"><label>Column name</label><input type="text" id="newColName"></div>
+    <div class="form-group"><label>Type</label><input type="text" id="newColType" placeholder="VARCHAR(255), INTEGER, TEXT..."></div>
+    <div class="form-row">
+      <label class="chk"><input type="checkbox" id="newColNotNull"> NOT NULL</label>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addColumn('${schema}','${name}')" style="width:auto">Add</button>
+    </div>`;
+  openModal('Add Column', html);
+}
+
+async function addColumn(schema, name) {
+  const column = document.getElementById('newColName').value.trim();
+  const columnType = document.getElementById('newColType').value.trim();
+  if (!column || !columnType) return showToast('Fill in all fields', 'error');
+  try {
+    const res = await fetch('/table/alter', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ schema, name, action:'add', column, columnType }) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Column added');
+    closeModal();
+    showTableStructure(schema, name);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+function showDropColumnModal(schema, name) {
+  const opts = tableColumns.map(c => `<option value="${c.column_name}">${c.column_name} (${c.data_type})</option>`).join('');
+  const html = `<div class="form-group"><label>Column to drop</label><select id="dropColName">${opts}</select></div>
+    <div class="form-actions">
+      <button class="btn btn-sm" onclick="dropColumn('${schema}','${name}')" style="background:var(--danger);color:#fff">Drop column</button>
+    </div>`;
+  openModal('Drop Column', html);
+}
+
+async function dropColumn(schema, name) {
+  const column = document.getElementById('dropColName').value;
+  if (!confirm(`Drop column "${column}"?`)) return;
+  try {
+    const res = await fetch('/table/alter', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ schema, name, action:'drop', column }) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Column dropped');
+    closeModal();
+    showTableStructure(schema, name);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function showIndexPanel(schema, name) {
+  try {
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/indexes`);
+    const indexes = await res.json();
+    if (indexes.error) throw new Error(indexes.error);
+    let html = '<div class="table-wrapper"><table><thead><tr><th>Index</th><th>Definition</th><th></th></tr></thead><tbody>';
+    indexes.forEach(idx => {
+      html += `<tr><td><strong>${idx.indexname}</strong></td><td><code style="font-size:11px">${idx.indexdef}</code></td><td><button class="btn-sm" onclick="dropIndex('${schema}','${name}','${idx.indexname}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2"></i></button></td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    html += '<h4 style="color:var(--text-primary);margin:16px 0 12px">Create index</h4>';
+    html += `<div class="form-group"><label>Index name</label><input type="text" id="newIdxName" placeholder="idx_${name}_..."></div>`;
+    html += `<div class="form-group"><label>Columns (comma separated)</label><input type="text" id="newIdxCols" placeholder="col1, col2"></div>`;
+    html += `<label class="chk"><input type="checkbox" id="newIdxUnique"> UNIQUE</label>`;
+    html += `<div class="form-actions"><button class="btn btn-primary" onclick="createIndex('${schema}','${name}')" style="width:auto">Create</button></div>`;
+    openModal('Indexes: ' + name, html);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function createIndex(schema, name) {
+  const indexName = document.getElementById('newIdxName').value.trim();
+  const columns = document.getElementById('newIdxCols').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const unique = document.getElementById('newIdxUnique').checked;
+  if (!indexName || columns.length === 0) return showToast('Fill in all fields', 'error');
+  try {
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/index`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ indexName, columns, unique }) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Index created');
+    showIndexPanel(schema, name);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function dropIndex(schema, name, indexName) {
+  if (!confirm(`Drop index "${indexName}"?`)) return;
+  try {
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/index/${encodeURIComponent(indexName)}`, { method:'DELETE' });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Index dropped');
+    showIndexPanel(schema, name);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+function showImportCSV(schema, name) {
+  const html = `<p style="color:var(--text-secondary);margin-bottom:12px;font-size:13px">Paste CSV data below. First row should be headers.</p>
+    <div class="form-group"><label>CSV Data</label><textarea id="csvData" rows="10" placeholder="col1,col2,col3\nval1,val2,val3" style="font-family:'JetBrains Mono',monospace;font-size:12px"></textarea></div>
+    <div class="form-actions"><button class="btn btn-primary" onclick="importCSV('${schema}','${name}')" style="width:auto"><i class="lucide-upload"></i> Import</button></div>`;
+  openModal('Import CSV: ' + name, html);
+}
+
+async function importCSV(schema, name) {
+  const csvText = document.getElementById('csvData').value.trim();
+  if (!csvText) return showToast('Paste CSV data first', 'error');
+  const lines = csvText.split('\n');
+  const headers = lines[0].split(',').map(h=>h.trim());
+  const rows = lines.slice(1).map(line => {
+    const vals = line.split(',');
+    const row = {};
+    headers.forEach((h, i) => { row[h] = vals[i]?.trim() || null; });
+    return row;
+  });
+  try {
+    const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/import-csv`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ schema, name, rows, columns: headers }) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast(`Imported ${data.inserted} row(s)`);
+    closeModal();
+    loadTableData(schema, name);
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+function confirmDeleteTable(schema, name) {
+  if (!confirm(`Drop table "${schema}.${name}"? This cannot be undone!`)) return;
+  fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}`, { method:'DELETE' })
+    .then(r => r.json()).then(d => {
+      if (d.error) return showToast(d.error, 'error');
+      showToast('Table dropped');
+      loadTables();
+      document.getElementById('tableContent').innerHTML = '<p class="hint">Select a table from the list on the left.</p>';
+    });
 }
 
 async function saveRow(btn) {
@@ -832,17 +1270,156 @@ async function saveRow(btn) {
   });
   try {
     const res = await fetch(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(table)}/${encodeURIComponent(pkCol)}/${encodeURIComponent(pkVal)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates)
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    btn.textContent = 'Saved!';
-    setTimeout(() => { btn.textContent = 'Save'; }, 2000);
-  } catch (err) {
-    alert('Error: ' + err.message);
-  }
+    showToast('Row saved');
+  } catch (err) { showToast('Error: ' + err.message, 'error'); }
+}
+
+function switchQueryTab(idx) {
+  queryTabs[activeQueryTab].sql = document.getElementById('sqlInput').value;
+  activeQueryTab = idx;
+  document.querySelectorAll('.query-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.query-tab[data-tab="${idx}"]`)?.classList.add('active');
+  document.getElementById('sqlInput').value = queryTabs[idx].sql || '';
+  document.getElementById('queryResult').innerHTML = queryTabs[idx].result || '';
+}
+
+function addQueryTab() {
+  queryTabs[activeQueryTab].sql = document.getElementById('sqlInput').value;
+  const idx = queryTabs.length;
+  queryTabs.push({ sql: '', result: '' });
+  renderQueryTabs();
+  switchQueryTab(idx);
+}
+
+function closeQueryTab(idx) {
+  if (queryTabs.length <= 1) return;
+  queryTabs.splice(idx, 1);
+  if (activeQueryTab >= queryTabs.length) activeQueryTab = queryTabs.length - 1;
+  renderQueryTabs();
+  switchQueryTab(activeQueryTab);
+}
+
+function renderQueryTabs() {
+  const container = document.getElementById('queryTabs');
+  container.innerHTML = queryTabs.map((t, i) => `<div class="query-tab ${i===activeQueryTab?'active':''}" data-tab="${i}" onclick="switchQueryTab(${i})">Query ${i+1} <span class="query-tab-close" onclick="event.stopPropagation();closeQueryTab(${i})">&times;</span></div>`).join('') + '<button class="query-tab-add" onclick="addQueryTab()"><i class="lucide-plus"></i></button>';
+}
+
+function handleQueryKeydown(event) {
+  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); executeQuery(); }
+  if (event.key === 'Escape') { document.getElementById('autocompleteDropdown').style.display = 'none'; }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const textarea = document.getElementById('sqlInput');
+  if (!textarea) return;
+  textarea.addEventListener('input', function(e) {
+    const val = this.value;
+    const cursorPos = this.selectionStart;
+    const textBefore = val.substring(0, cursorPos);
+    const words = textBefore.split(/[\s,()]+/);
+    const currentWord = words[words.length - 1].toLowerCase();
+    const dropdown = document.getElementById('autocompleteDropdown');
+    if (currentWord.length < 2) { dropdown.style.display = 'none'; return; }
+    const matches = tableAutocomplete.filter(w => w.toLowerCase().startsWith(currentWord) && w.toLowerCase() !== currentWord).slice(0, 8);
+    if (matches.length === 0) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = matches.map(m => `<div class="autocomplete-item" onmousedown="selectAutocomplete('${m}', ${cursorPos - currentWord.length}, ${cursorPos})">${m}</div>`).join('');
+    dropdown.style.display = 'block';
+  });
+});
+
+function selectAutocomplete(word, start, end) {
+  const textarea = document.getElementById('sqlInput');
+  const val = textarea.value;
+  textarea.value = val.substring(0, start) + word + val.substring(end);
+  textarea.selectionStart = textarea.selectionEnd = start + word.length;
+  document.getElementById('autocompleteDropdown').style.display = 'none';
+  textarea.focus();
+}
+
+async function formatSQL() {
+  const sql = document.getElementById('sqlInput').value;
+  if (!sql.trim()) return;
+  try {
+    const res = await fetch('/sql/format', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sql }) });
+    const data = await res.json();
+    document.getElementById('sqlInput').value = data.formatted;
+    showToast('SQL formatted');
+  } catch(e) {}
+}
+
+function clearEditor() {
+  document.getElementById('sqlInput').value = '';
+  document.getElementById('queryResult').innerHTML = '';
+  queryTabs[activeQueryTab].result = '';
+}
+
+async function saveBookmark() {
+  const sql = document.getElementById('sqlInput').value.trim();
+  if (!sql) return showToast('No query to save', 'error');
+  const name = prompt('Bookmark name:');
+  if (!name) return;
+  try {
+    const res = await fetch('/query/bookmark', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sql, name }) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Bookmark saved');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function showQueryBookmarks() {
+  try {
+    const res = await fetch('/query/bookmarks');
+    const bookmarks = await res.json();
+    let html = bookmarks.length === 0 ? '<p class="hint">No bookmarks yet.</p>' : '<div class="bookmark-list">';
+    bookmarks.forEach(b => {
+      html += `<div class="bookmark-item"><div style="flex:1"><strong>${b.name}</strong><pre class="bookmark-sql">${b.sql}</pre></div><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="loadBookmark('${b.sql.replace(/'/g, "\\'")}')"><i class="lucide-play"></i></button><button class="btn btn-sm" onclick="deleteBookmark(${b.id})" style="background:var(--danger-bg);color:var(--danger)"><i class="lucide-trash-2"></i></button></div></div>`;
+    });
+    html += '</div>';
+    openModal('Query Bookmarks', html);
+  } catch(e) {}
+}
+
+function loadBookmark(sql) { document.getElementById('sqlInput').value = sql; closeModal(); }
+
+async function deleteBookmark(id) {
+  await fetch(`/query/bookmark/${id}`, { method:'DELETE' });
+  showQueryBookmarks();
+}
+
+async function showQueryHistory() {
+  try {
+    const res = await fetch('/query/history');
+    const history = await res.json();
+    let html = history.length === 0 ? '<p class="hint">No history yet.</p>' : '<div class="history-list">';
+    history.forEach(h => {
+      const cls = h.error ? 'history-error' : '';
+      html += `<div class="history-item ${cls}" onclick="loadBookmark(this.querySelector('.history-sql').textContent)"><div class="history-meta"><span>${new Date(h.timestamp).toLocaleTimeString()}</span><span>${h.duration}ms</span><span>${h.rowCount || 0} rows</span></div><pre class="history-sql">${h.sql}</pre></div>`;
+    });
+    html += '</div>';
+    openModal('Query History', html);
+  } catch(e) {}
+}
+
+async function showExplain() {
+  const sql = document.getElementById('sqlInput').value.trim();
+  if (!sql) return showToast('Enter a query first', 'error');
+  try {
+    const res = await fetch('/query/explain', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sql }) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    let html = '<pre class="explain-output">';
+    if (Array.isArray(data.result)) {
+      html += JSON.stringify(data.result, null, 2);
+    } else {
+      html += JSON.stringify(data.result, null, 2);
+    }
+    html += '</pre>';
+    openModal('EXPLAIN Analysis', html);
+  } catch (err) { showToast(err.message, 'error'); }
 }
 
 async function executeQuery() {
@@ -851,13 +1428,12 @@ async function executeQuery() {
   const container = document.getElementById('queryResult');
   container.innerHTML = '<div class="loading">Executing...</div>';
   try {
-    const res = await fetch('/query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sql })
-    });
+    const start = Date.now();
+    const res = await fetch('/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sql }) });
     const data = await res.json();
+    const duration = Date.now() - start;
     if (data.error) throw new Error(data.error);
+    fetch('/query/history', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sql, duration: data.duration, rowCount: data.rowCount }) });
     let html = `<div class="query-meta">${data.command} — ${data.rowCount} row(s) — ${data.duration}ms</div>`;
     if (data.rows && data.rows.length > 0) {
       html += '<div class="table-wrapper"><table><thead><tr>';
@@ -865,22 +1441,75 @@ async function executeQuery() {
       html += '</tr></thead><tbody>';
       data.rows.forEach(row => {
         html += '<tr>';
-        Object.values(row).forEach(v => {
-          html += `<td>${v !== null && v !== undefined ? v : '<span class="null">NULL</span>'}</td>`;
-        });
+        Object.values(row).forEach(v => { html += `<td>${v !== null && v !== undefined ? v : '<span class="null">NULL</span>'}</td>`; });
         html += '</tr>';
       });
       html += '</tbody></table></div>';
     }
     container.innerHTML = html;
+    queryTabs[activeQueryTab].result = html;
   } catch (err) {
     container.innerHTML = `<div class="alert error">${err.message}</div>`;
+    fetch('/query/history', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sql, duration: 0, error: err.message }) });
   }
 }
 
-function exportCSV(schema, name) {
-  window.open(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/export`, '_blank');
+function showCreateTableModal() {
+  const html = `<div class="form-group"><label>Schema</label><input type="text" id="ctSchema" value="public"></div>
+    <div class="form-group"><label>Table name</label><input type="text" id="ctName"></div>
+    <div id="ctColumns">
+      <div class="ct-col-row">
+        <input type="text" placeholder="Column name" class="ct-col-name">
+        <input type="text" placeholder="Type (e.g. SERIAL, VARCHAR(255))" class="ct-col-type">
+        <label class="chk" style="font-size:11px"><input type="checkbox" class="ct-col-pk" checked> PK</label>
+        <label class="chk" style="font-size:11px"><input type="checkbox" class="ct-col-nn"> NN</label>
+      </div>
+    </div>
+    <button class="btn btn-sm" onclick="addCTColumn()" style="margin:8px 0"><i class="lucide-plus"></i> Add column</button>
+    <div class="form-actions"><button class="btn btn-primary" onclick="createTable()" style="width:auto"><i class="lucide-check"></i> Create table</button></div>`;
+  openModal('Create Table', html);
 }
+
+function addCTColumn() {
+  const container = document.getElementById('ctColumns');
+  const row = document.createElement('div');
+  row.className = 'ct-col-row';
+  row.innerHTML = `<input type="text" placeholder="Column name" class="ct-col-name"><input type="text" placeholder="Type" class="ct-col-type"><label class="chk" style="font-size:11px"><input type="checkbox" class="ct-col-pk"> PK</label><label class="chk" style="font-size:11px"><input type="checkbox" class="ct-col-nn"> NN</label>`;
+  container.appendChild(row);
+}
+
+async function createTable() {
+  const schema = document.getElementById('ctSchema').value.trim();
+  const name = document.getElementById('ctName').value.trim();
+  if (!schema || !name) return showToast('Fill in schema and name', 'error');
+  const rows = document.querySelectorAll('.ct-col-row');
+  const columns = [];
+  rows.forEach(row => {
+    const colName = row.querySelector('.ct-col-name').value.trim();
+    const colType = row.querySelector('.ct-col-type').value.trim();
+    if (colName && colType) columns.push({ name: colName, type: colType, primaryKey: row.querySelector('.ct-col-pk').checked, notNull: row.querySelector('.ct-col-nn').checked });
+  });
+  if (columns.length === 0) return showToast('Add at least one column', 'error');
+  try {
+    const res = await fetch('/table/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ schema, name, columns }) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Table created');
+    closeModal();
+    loadTables();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+function exportCSV(schema, name) { window.open(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/export`, '_blank'); }
+function exportSQL(schema, name) { window.open(`/table/${encodeURIComponent(schema)}/${encodeURIComponent(name)}/export-sql`, '_blank'); }
+
+function openModal(title, body) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = body;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() { document.getElementById('modalOverlay').classList.remove('show'); }
 
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -890,6 +1519,8 @@ function toggleSidebar() {
 window.addEventListener('DOMContentLoaded', () => {
   loadOverview();
   loadTables();
+  if (localStorage.getItem('theme') === 'light') toggleTheme();
+  monitorInterval = setInterval(() => { if (document.getElementById('view-monitor').classList.contains('active')) loadMonitor(); }, 5000);
 });
 <% } %>
 </script>
