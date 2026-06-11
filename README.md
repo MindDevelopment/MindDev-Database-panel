@@ -163,15 +163,6 @@ For MySQL/MariaDB, user names are shown as `user@host` format and the host field
 | `Ctrl+Enter` | Execute SQL query |
 | `Escape` | Close autocomplete dropdown |
 
-## GitHub Sync
-
-The `scripts/github.js` script commits and pushes the `server/` folder to a GitHub repository.
-
-```bash
-node scripts/github.js
-```
-
-Edit the `EXCLUDE` array at the top of the script to customize which files/directories are excluded from the sync. Default exclusions: `.git`, `.env`, `node_modules`, `package-lock.json`, `scripts`, `server.log`.
 
 ## Tech Stack
 
