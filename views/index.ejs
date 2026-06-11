@@ -126,73 +126,80 @@
         <% }); %>
       </div>
 
-      <div id="adminSection" style="display:none;margin-top:24px;border-top:1px solid #2a3a4a;padding-top:20px">
-        <h3 style="color:#fff;margin-bottom:12px">&#9881; Management</h3>
-        <div class="admin-tabs">
-          <button class="admin-tab active" onclick="showAdmTab('users')">Users</button>
-          <button class="admin-tab" onclick="showAdmTab('databases')">Databases</button>
-          <button class="admin-tab" onclick="showAdmTab('permissions')">Permissions</button>
-        </div>
-        <div id="adm-users" class="admin-tab-content active">
-          <div class="admin-section-header">
-            <h4 style="color:#aabbcc">Users / Roles</h4>
-            <button class="btn btn-primary" onclick="showAdmCreateUser()" style="width:auto;margin:0"><i class="lucide-user-plus" style="margin-right:4px"></i> New user</button>
-          </div>
-          <div id="admCreateUserForm" class="admin-form" style="display:none">
-            <div class="form-group"><label>Username</label><input type="text" id="admNewUserName"></div>
-            <div class="form-group" id="admHostGroup" style="display:none"><label>Host (e.g. localhost, %)</label><input type="text" id="admNewUserHost" placeholder="%"></div>
-            <div class="form-group"><label>Password</label><input type="text" id="admNewUserPass"></div>
-            <div class="form-row">
-              <label class="chk"><input type="checkbox" id="admCanLogin" checked> Can login</label>
-              <label class="chk"><input type="checkbox" id="admSuperuser"> Superuser</label>
-              <label class="chk"><input type="checkbox" id="admCreateDb"> Can create databases</label>
-              <label class="chk"><input type="checkbox" id="admCreateRole"> Can create roles</label>
+      <div id="adminSection" style="display:none">
+        <button class="collapse-toggle" onclick="toggleManagement()" id="mgmtToggle">
+          <span><i class="lucide-settings" style="margin-right:8px"></i> Management</span>
+          <span class="chevron"><i class="lucide-chevron-down"></i></span>
+        </button>
+        <div class="collapse-content" id="mgmtContent">
+          <div style="padding-top:16px">
+            <div class="admin-tabs">
+              <button class="admin-tab active" onclick="showAdmTab('users')">Users</button>
+              <button class="admin-tab" onclick="showAdmTab('databases')">Databases</button>
+              <button class="admin-tab" onclick="showAdmTab('permissions')">Permissions</button>
             </div>
-            <div class="form-actions">
-              <button class="btn btn-primary" onclick="admCreateUser()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Create</button>
-              <button class="btn" onclick="admHideCreateUser()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
+            <div id="adm-users" class="admin-tab-content active">
+              <div class="admin-section-header">
+                <h4 style="color:#aabbcc">Users / Roles</h4>
+                <button class="btn btn-primary" onclick="showAdmCreateUser()" style="width:auto;margin:0"><i class="lucide-user-plus" style="margin-right:4px"></i> New user</button>
+              </div>
+              <div id="admCreateUserForm" class="admin-form" style="display:none">
+                <div class="form-group"><label>Username</label><input type="text" id="admNewUserName"></div>
+                <div class="form-group" id="admHostGroup" style="display:none"><label>Host (e.g. localhost, %)</label><input type="text" id="admNewUserHost" placeholder="%"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="admNewUserPass"></div>
+                <div class="form-row">
+                  <label class="chk"><input type="checkbox" id="admCanLogin" checked> Can login</label>
+                  <label class="chk"><input type="checkbox" id="admSuperuser"> Superuser</label>
+                  <label class="chk"><input type="checkbox" id="admCreateDb"> Can create databases</label>
+                  <label class="chk"><input type="checkbox" id="admCreateRole"> Can create roles</label>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" onclick="admCreateUser()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Create</button>
+                  <button class="btn" onclick="admHideCreateUser()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
+                </div>
+              </div>
+              <div id="admUsersList" class="admin-list"></div>
+            </div>
+            <div id="adm-databases" class="admin-tab-content">
+              <div class="admin-section-header">
+                <h4 style="color:#aabbcc">Databases</h4>
+                <button class="btn btn-primary" onclick="showAdmCreateDb()" style="width:auto;margin:0"><i class="lucide-database" style="margin-right:4px"></i> New database</button>
+              </div>
+              <div id="admCreateDbForm" class="admin-form" style="display:none">
+                <div class="form-group"><label>Database name</label><input type="text" id="admNewDbName"></div>
+                <div class="form-group" id="admOwnerGroup"><label>Owner (empty = current user)</label><input type="text" id="admNewDbOwner"></div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" onclick="admCreateDb()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Create</button>
+                  <button class="btn" onclick="admHideCreateDb()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
+                </div>
+              </div>
+              <div id="admDbsList" class="admin-list"></div>
+            </div>
+            <div id="adm-permissions" class="admin-tab-content">
+              <h4 style="color:#aabbcc;margin-bottom:12px">Manage permissions</h4>
+              <div class="admin-form">
+                <div class="form-group"><label>User</label><select id="admPermUser"></select></div>
+                <div class="form-group"><label>Database</label><select id="admPermDb"></select></div>
+                <div class="form-group">
+                  <label>Privilege</label>
+                  <select id="admPermPriv">
+                    <option value="SELECT">SELECT (Read)</option>
+                    <option value="INSERT">INSERT (Insert)</option>
+                    <option value="UPDATE">UPDATE (Update)</option>
+                    <option value="DELETE">DELETE (Delete)</option>
+                    <option value="ALL">ALL (All)</option>
+                  </select>
+                </div>
+                <div class="form-actions" style="flex-wrap:wrap">
+                  <button class="btn btn-primary" onclick="admGrantPerm()" style="width:auto"><i class="lucide-shield-check" style="margin-right:4px"></i> Grant</button>
+                  <button class="btn" onclick="admRevokePerm()" style="width:auto;background:var(--danger-bg);color:var(--danger);border:1px solid rgba(239,68,68,0.2)"><i class="lucide-shield-x" style="margin-right:4px"></i> Revoke</button>
+                  <button class="btn" onclick="admGrantDb()" style="width:auto;background:var(--success-bg);color:var(--success);border:1px solid rgba(34,197,94,0.2)"><i class="lucide-database" style="margin-right:4px"></i> Grant DB</button>
+                  <button class="btn" onclick="admRevokeDb()" style="width:auto;background:rgba(245,158,11,0.1);color:var(--warning);border:1px solid rgba(245,158,11,0.2)"><i class="lucide-database" style="margin-right:4px"></i> Revoke DB</button>
+                </div>
+              </div>
+              <div id="admPermResult" class="admin-list" style="margin-top:12px"></div>
             </div>
           </div>
-          <div id="admUsersList" class="admin-list"></div>
-        </div>
-        <div id="adm-databases" class="admin-tab-content">
-          <div class="admin-section-header">
-            <h4 style="color:#aabbcc">Databases</h4>
-            <button class="btn btn-primary" onclick="showAdmCreateDb()" style="width:auto;margin:0"><i class="lucide-database" style="margin-right:4px"></i> New database</button>
-          </div>
-          <div id="admCreateDbForm" class="admin-form" style="display:none">
-            <div class="form-group"><label>Database name</label><input type="text" id="admNewDbName"></div>
-            <div class="form-group" id="admOwnerGroup"><label>Owner (empty = current user)</label><input type="text" id="admNewDbOwner"></div>
-            <div class="form-actions">
-              <button class="btn btn-primary" onclick="admCreateDb()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Create</button>
-              <button class="btn" onclick="admHideCreateDb()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
-            </div>
-          </div>
-          <div id="admDbsList" class="admin-list"></div>
-        </div>
-        <div id="adm-permissions" class="admin-tab-content">
-          <h4 style="color:#aabbcc;margin-bottom:12px">Manage permissions</h4>
-          <div class="admin-form">
-            <div class="form-group"><label>User</label><select id="admPermUser"></select></div>
-            <div class="form-group"><label>Database</label><select id="admPermDb"></select></div>
-            <div class="form-group">
-              <label>Privilege</label>
-              <select id="admPermPriv">
-                <option value="SELECT">SELECT (Read)</option>
-                <option value="INSERT">INSERT (Insert)</option>
-                <option value="UPDATE">UPDATE (Update)</option>
-                <option value="DELETE">DELETE (Delete)</option>
-                <option value="ALL">ALL (All)</option>
-              </select>
-            </div>
-            <div class="form-actions" style="flex-wrap:wrap">
-              <button class="btn btn-primary" onclick="admGrantPerm()" style="width:auto"><i class="lucide-shield-check" style="margin-right:4px"></i> Grant</button>
-              <button class="btn" onclick="admRevokePerm()" style="width:auto;background:var(--danger-bg);color:var(--danger);border:1px solid rgba(239,68,68,0.2)"><i class="lucide-shield-x" style="margin-right:4px"></i> Revoke</button>
-              <button class="btn" onclick="admGrantDb()" style="width:auto;background:var(--success-bg);color:var(--success);border:1px solid rgba(34,197,94,0.2)"><i class="lucide-database" style="margin-right:4px"></i> Grant DB</button>
-              <button class="btn" onclick="admRevokeDb()" style="width:auto;background:rgba(245,158,11,0.1);color:var(--warning);border:1px solid rgba(245,158,11,0.2)"><i class="lucide-database" style="margin-right:4px"></i> Revoke DB</button>
-            </div>
-          </div>
-          <div id="admPermResult" class="admin-list" style="margin-top:12px"></div>
         </div>
       </div>
 
@@ -204,17 +211,32 @@
 
 <script>
 let admDbType = 'postgres';
+let admEditingUser = null;
+
+function toggleManagement() {
+  const toggle = document.getElementById('mgmtToggle');
+  const content = document.getElementById('mgmtContent');
+  const isOpen = content.classList.contains('open');
+  toggle.classList.toggle('open');
+  content.classList.toggle('open');
+  if (!isOpen) {
+    showAdmTab('users');
+  }
+}
+
 (async function() {
   try {
     const r = await fetch('/admin/check'); const d = await r.json();
     admDbType = d.type || 'postgres';
     if (d.superuser) {
       document.getElementById('adminSection').style.display = '';
-      showAdmTab('users');
     }
   } catch(e) {}
 })();
+
 function showAdmTab(t) {
+  const content = document.getElementById('mgmtContent');
+  if (!content.classList.contains('open')) return;
   document.querySelectorAll('#adminSection .admin-tab-content').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('#adminSection .admin-tab').forEach(e=>e.classList.remove('active'));
   document.getElementById('adm-'+t).classList.add('active');
@@ -223,6 +245,7 @@ function showAdmTab(t) {
   if (t==='databases') admLoadDbs();
   if (t==='permissions') { admLoadPermUsers(); admLoadPermDbs(); }
 }
+
 async function admLoadUsers() {
   const el=document.getElementById('admUsersList'); el.innerHTML='<div class="loading">Loading...</div>';
   try {
@@ -230,14 +253,81 @@ async function admLoadUsers() {
     if (!r.ok) { el.innerHTML=`<div class="alert error">Load error (${r.status})</div>`; return; }
     const roles=await r.json();
     if (!Array.isArray(roles)) { el.innerHTML=`<div class="alert error">Invalid response</div>`; return; }
-    let html='<div class="table-wrapper"><table><thead><tr><th>User</th><th>Superuser</th><th>CreateDB</th><th>CreateRole</th><th></th></tr></thead><tbody>';
+    let html='<div class="table-wrapper"><table><thead><tr><th>User</th><th>Login</th><th>Superuser</th><th>CreateDB</th><th>CreateRole</th><th></th></tr></thead><tbody>';
     roles.forEach(r => {
-            html+=`<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreatedb?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreaterole?'<span style="color:var(--success)">&#10003;</span>':''}</td><td><button class="btn-sm" onclick="admDelRole('${r.rolname.replace(/'/g, "\\'")}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2" style="font-size:12px"></i></button></td></tr>`;
+      html+=`<tr>
+        <td><strong>${r.rolname}</strong></td>
+        <td>${r.rolcanlogin?'<span style="color:var(--success)">&#10003;</span>':'<span style="color:var(--text-muted)">&#10007;</span>'}</td>
+        <td>${r.rolsuper?'<span style="color:var(--success)">&#10003;</span>':''}</td>
+        <td>${r.rolcreatedb?'<span style="color:var(--success)">&#10003;</span>':''}</td>
+        <td>${r.rolcreaterole?'<span style="color:var(--success)">&#10003;</span>':''}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-sm" onclick="admEditUser('${r.rolname.replace(/'/g, "\\'")}')" style="background:rgba(59,130,246,0.15);color:var(--accent);padding:4px 10px;margin-right:4px"><i class="lucide-pencil" style="font-size:12px"></i></button>
+          <button class="btn-sm" onclick="admDelRole('${r.rolname.replace(/'/g, "\\'")}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2" style="font-size:12px"></i></button>
+        </td>
+      </tr>`;
     });
     html+='</tbody></table></div>';
+    html+='<div id="admEditUserPanel"></div>';
     el.innerHTML=html;
   } catch(e) { el.innerHTML=`<div class="alert error">${e.message}</div>`; }
 }
+
+function admEditUser(name) {
+  admEditingUser = name;
+  const panel = document.getElementById('admEditUserPanel');
+  panel.innerHTML = `
+    <div class="edit-user-form">
+      <h4 style="color:var(--text-primary);margin-bottom:14px;font-size:14px"><i class="lucide-pencil" style="margin-right:6px"></i> Edit user: <span style="color:var(--accent)">${name}</span></h4>
+      <div class="form-group">
+        <label>New password</label>
+        <input type="password" id="admEditPass" placeholder="Leave empty to keep current">
+      </div>
+      ${admDbType !== 'postgres' ? `
+      <div class="form-group">
+        <label>Host</label>
+        <input type="text" id="admEditHost" placeholder="%" value="%">
+      </div>` : ''}
+      <div class="form-row">
+        <label class="chk"><input type="checkbox" id="admEditCanLogin"> Can login</label>
+        <label class="chk"><input type="checkbox" id="admEditSuperuser"> Superuser</label>
+        <label class="chk"><input type="checkbox" id="admEditCreateDb"> Can create databases</label>
+        <label class="chk"><input type="checkbox" id="admEditCreateRole"> Can create roles</label>
+      </div>
+      <div class="edit-user-actions">
+        <button class="btn btn-primary" onclick="admSaveUser()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Save changes</button>
+        <button class="btn" onclick="admCancelEdit()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function admCancelEdit() {
+  admEditingUser = null;
+  document.getElementById('admEditUserPanel').innerHTML = '';
+}
+
+async function admSaveUser() {
+  if (!admEditingUser) return;
+  const password = document.getElementById('admEditPass').value;
+  const body = { password };
+  if (admDbType !== 'postgres') {
+    body.host = document.getElementById('admEditHost').value.trim() || '%';
+  }
+  if (password) {
+    const r = await fetch(`/admin/role/${encodeURIComponent(admEditingUser)}/password`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ password })
+    });
+    const d = await r.json();
+    if (d.error) return alert('Error: ' + d.error);
+  }
+  admCancelEdit();
+  admLoadUsers();
+  alert('Password updated successfully!');
+}
+
 function showAdmCreateUser() {
   const f=document.getElementById('admCreateUserForm');
   document.getElementById('admHostGroup').style.display = (admDbType !== 'postgres') ? '' : 'none';
@@ -453,8 +543,49 @@ async function loadUsers2() {
     const roles = await res.json();
     if (roles.error) throw new Error(roles.error);
     el.innerHTML = '<div class="table-wrapper"><table><thead><tr><th>Role</th><th>Superuser</th><th>Login</th><th>Create DB</th><th>Create Role</th><th>Connections</th><th></th></tr></thead><tbody>' +
-      roles.map(r => `<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcanlogin?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreatedb?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreaterole?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolconnlimit}</td><td><button class="btn-sm" onclick="deleteRole2('${r.rolname}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2" style="font-size:12px"></i></button></td></tr>`).join('') + '</tbody></table></div>';
+      roles.map(r => `<tr><td><strong>${r.rolname}</strong></td><td>${r.rolsuper?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcanlogin?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreatedb?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolcreaterole?'<span style="color:var(--success)">&#10003;</span>':''}</td><td>${r.rolconnlimit}</td><td style="white-space:nowrap"><button class="btn-sm" onclick="editUser2('${r.rolname}')" style="background:rgba(59,130,246,0.15);color:var(--accent);padding:4px 10px;margin-right:4px"><i class="lucide-pencil" style="font-size:12px"></i></button><button class="btn-sm" onclick="deleteRole2('${r.rolname}')" style="background:var(--danger);padding:4px 10px"><i class="lucide-trash-2" style="font-size:12px"></i></button></td></tr>`).join('') + '</tbody></table></div><div id="editUserPanel2"></div>';
   } catch (err) { el.innerHTML = `<div class="alert error">${err.message}</div>`; }
+}
+
+let editingUser2 = null;
+
+function editUser2(name) {
+  editingUser2 = name;
+  const panel = document.getElementById('editUserPanel2');
+  panel.innerHTML = `
+    <div class="edit-user-form">
+      <h4 style="color:var(--text-primary);margin-bottom:14px;font-size:14px"><i class="lucide-pencil" style="margin-right:6px"></i> Edit user: <span style="color:var(--accent)">${name}</span></h4>
+      <div class="form-group">
+        <label>New password</label>
+        <input type="password" id="editPass2" placeholder="Leave empty to keep current">
+      </div>
+      <div class="edit-user-actions">
+        <button class="btn btn-primary" onclick="saveUser2()" style="width:auto"><i class="lucide-check" style="margin-right:4px"></i> Save changes</button>
+        <button class="btn" onclick="cancelEdit2()" style="width:auto;background:rgba(51,65,85,0.5)">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function cancelEdit2() {
+  editingUser2 = null;
+  document.getElementById('editUserPanel2').innerHTML = '';
+}
+
+async function saveUser2() {
+  if (!editingUser2) return;
+  const password = document.getElementById('editPass2').value;
+  if (!password) return alert('Enter a new password');
+  const r = await fetch(`/admin/role/${encodeURIComponent(editingUser2)}/password`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ password })
+  });
+  const d = await r.json();
+  if (d.error) return alert('Error: ' + d.error);
+  cancelEdit2();
+  loadUsers2();
+  alert('Password updated successfully!');
 }
 function showCreateUser2() { document.getElementById('createUserForm2').style.display='block'; }
 function hideCreateUser2() { document.getElementById('createUserForm2').style.display='none'; }

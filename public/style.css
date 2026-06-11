@@ -780,6 +780,9 @@ tr:last-child td { border-bottom: none; }
 .admin-tab-content { display: none; }
 .admin-tab-content.active { display: block; animation: fadeIn 0.3s ease-out; }
 
+#adminSection .admin-tab-content { display: none; }
+#adminSection .collapse-content.open .admin-tab-content.active { display: block; }
+
 .admin-section-header {
   display: flex;
   justify-content: space-between;
@@ -865,6 +868,88 @@ tr:last-child td { border-bottom: none; }
 
 .admin-list .table-wrapper {
   margin-top: 0;
+}
+
+.collapse-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 18px;
+  background: linear-gradient(145deg, rgba(17, 24, 39, 0.9), rgba(15, 23, 42, 0.85));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 20px;
+}
+
+.collapse-toggle:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.collapse-toggle .chevron {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.collapse-toggle.open .chevron {
+  transform: rotate(180deg);
+}
+
+.collapse-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.collapse-content.open {
+  max-height: 5000px;
+  opacity: 1;
+  visibility: visible;
+}
+
+.collapse-content .admin-tab-content {
+  display: none;
+}
+
+.collapse-content.open .admin-tab-content.active {
+  display: block;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.edit-user-form {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-top: 10px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.edit-user-form .form-group {
+  margin-bottom: 12px;
+}
+
+.edit-user-form .form-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.edit-user-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
 .setup-types {
